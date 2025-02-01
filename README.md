@@ -149,7 +149,7 @@ There are 3 sample apps you can run to see demos of how `single-page-express` ca
      
      - Go to http://localhost:3000
 
-2- Basic frontend-only sample app with templating:
+2. Basic frontend-only sample app with templating:
 
 - Similar to the above demo, but includes a templating engine and demos page navigation in the single page app context.
 
@@ -163,7 +163,7 @@ There are 3 sample apps you can run to see demos of how `single-page-express` ca
   
   - Go to [http://localhost:3000](http://localhost:3000)
 
-3- Express-based sample app:
+3. Express-based sample app:
 
 - This is a full Express app that demos sharing routes and templates on the backend and frontend.
 
