@@ -33,13 +33,9 @@ First, install `single-page-express` from npm.
 The package is distributed with the following builds available:
 
 - `dist/single-page-express.cjs`: CommonJS bundle.
-
 - `dist/single-page-express.js`: Standalone bundle that can be included via `<script>` tags.
-
 - `dist/single-page-express.min.js`: Minified standalone bundle that can be included via `<script>` tags.
-
 - `dist/single-page-express.mjs`: ES module.
-
 - `dist/single-page-express.min.mjs`: Minified ES module.
 
 Then, in your frontend code:
@@ -126,9 +122,7 @@ You can also call `app.triggerRoute(params)` to activate the route callback regi
 Params accepted by `app.triggerRoute` include:
 
 - `route`: Which route you're triggering.
-
 - `method`: e.g. GET, POST, etc. (Case insensitive.)
-
 - `body`: What to supply to `req.body` if you're triggering a POST.
 
 ## Running the sample apps
@@ -136,51 +130,30 @@ Params accepted by `app.triggerRoute` include:
 There are 3 sample apps you can run to see demos of how `single-page-express` can be used:
 
 1. Basic frontend-only sample app:
-   
    - This is a minimalist demo of `single-page-express` that just demos various kinds of routes working as expected, but does not wire up any templating system or do anything other than log data to the console when the render method is called.
-   
    - To run it:
-     
      - `npm ci`
-     
      - `npm run sample-app-basic-frontend-only`
-       
        - Or `npm run sample1`
-     
      - Go to http://localhost:3000
 
 2. Basic frontend-only sample app with templating:
-
    - Similar to the above demo, but includes a templating engine and demos page navigation in the single page app context.
-
    - To run it:
-    
      - `npm ci`
-  
      - `npm run sample-app-basic-frontend-only-with-templating`
-    
        - Or `npm run sample2`
-  
    - Go to [http://localhost:3000](http://localhost:3000)
 
 3. Express-based sample app:
-
    - This is a full Express app that demos sharing routes and templates on the backend and frontend.
-
    - To run it:
-  
      - `cd sampleApps/express` 
-  
      - `npm ci`
-  
      - `cd ../../`
-  
      - `npm run express-sample`
-    
        - Or `npm run sample3`
-    
        - Or `cd` into `sampleApps/express` and run `npm ci` and `npm start`
-  
    - Go to [http://localhost:3000](http://localhost:3000)
 
 ## API
@@ -215,21 +188,15 @@ These constructor params are only relevant if you're not supplying a custom rend
 ##### Pre-render
 
 - `beforeEveryRender(model)`: Optionally supply a function to execute just before your template is rendered and written to the DOM. Useful for beginning a CSS transition.
-  
   - You can also set `res.beforeRender(model)` on a per request basis.
-
 - `defaultTarget`: Query string representing the default element to target if one is not supplied by `res.target`. Defaults to the `<body>` tag if neither `res.target` or `app.defaultTarget` is supplied.
-
 - `updateDelay`: How long to wait in milliseconds between rendering the template and writing its contents to the DOM. This is useful to give your animations time to animate if you're using animations. Default: `0`
-  
   - You can also set `res.updateDelay` on a per request basis.
 
 ##### Post-render
 
 - `afterEveryRender(model)`: Optionally supply a function to execute just after your template is rendered and written to the DOM. Useful for finishing a CSS transition.
-  
   - You can also set `res.afterRender(model)` on a per request basis.
-
 - `postRenderCallbacks`: Optionally supply an object with keys that are template names and values that are functions to execute after that template renders. You can also supply `*` as a key to execute a post-render callback after every template render.
 
 ### Application object
@@ -312,13 +279,9 @@ When you call the constructor, it will return an `app` object.
 ##### New methods defined by single-page-express
 
 - `app.triggerRoute(params)`: This will activate the route callback registered for a given route, as though a link was clicked or a form was POSTed.
-  
   - Params accepted by `app.triggerRoute` include:
-    
     - `route`: Which route you're triggering.
-    
     - `method`: e.g. GET, POST, etc. (Case insensitive.)
-    
     - `body`: What to supply to `req.body` if you're triggering a POST.
 
 ### Request object
@@ -367,13 +330,9 @@ Likewise all other `req` methods [from the Node.js API](https://nodejs.org/api/h
 ##### New properties defined by single-page-express
 
 - `res.afterRender(model)`: If using the default render method, you can set this to a function that will execute after every render.
-
 - `res.beforeRender(model)` If using the default render method, you can set this to a function that will execute before every render.
-
 - `res.target`: If using the default render method, use this variable to set a query selector to determine which element's contents will be replaced by your template render's contents. If none is supplied, the `<body>` tag's contents will be replaced.
-
 - `res.title`: If using the default render method, use this variable to set a page title for the new render.
-
 - `res.updateDelay`: If using the default render method, use this variable to set a delay in milliseconds before the render occurs.
 
 #### Methods
