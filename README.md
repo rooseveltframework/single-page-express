@@ -171,7 +171,11 @@ There are 3 sample apps you can run to see demos of how `single-page-express` ca
 
 - To run it:
   
+  - `cd sampleApps/express` 
+  
   - `npm ci`
+  
+  - `cd ../../`
   
   - `npm run express-sample`
     
@@ -310,7 +314,9 @@ When you call the constructor, it will return an `app` object.
 ##### New methods defined by single-page-express
 
 - `app.triggerRoute(params)`: This will activate the route callback registered for a given route, as though a link was clicked or a form was POSTed.
+  
   - Params accepted by `app.triggerRoute` include:
+    
     - `route`: Which route you're triggering.
     
     - `method`: e.g. GET, POST, etc. (Case insensitive.)
