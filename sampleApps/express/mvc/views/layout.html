@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="format-detection" content="telephone=no">
+    <title>Sample app for single-page-express</title>
+    <style>
+      #page-contents {
+        transition: opacity 0.2s ease;
+      }
+    </style>
+    <script src="bundle.js" defer></script>
+  </head>
+<body>
+  <p>Open the browser console to see logs that illustrate how the single page app is handling navigation events.</p>
+  <nav>
+    <ul>
+      <li><a href="/">Homepage</a></li>
+      <li><a href="/secondPage">Second page</a></li>
+      <li><a href="/pageWithForm">Page with form</a></li>
+      <li><a href="/pageWithDataRetrieval">Page with data retrieval from the server</a></li>
+    </ul>
+  </nav>
+  <article id="page-contents">
+    {pageContent|s}
+  </article>
+</body>
+</html>
