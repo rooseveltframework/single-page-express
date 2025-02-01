@@ -151,37 +151,37 @@ There are 3 sample apps you can run to see demos of how `single-page-express` ca
 
 2. Basic frontend-only sample app with templating:
 
-- Similar to the above demo, but includes a templating engine and demos page navigation in the single page app context.
+   - Similar to the above demo, but includes a templating engine and demos page navigation in the single page app context.
 
-  - To run it:
+   - To run it:
     
-    - `npm ci`
+     - `npm ci`
   
-    - `npm run sample-app-basic-frontend-only-with-templating`
+     - `npm run sample-app-basic-frontend-only-with-templating`
     
-      - Or `npm run sample2`
+       - Or `npm run sample2`
   
-  - Go to [http://localhost:3000](http://localhost:3000)
+   - Go to [http://localhost:3000](http://localhost:3000)
 
 3. Express-based sample app:
 
 - This is a full Express app that demos sharing routes and templates on the backend and frontend.
 
-  - To run it:
+   - To run it:
   
-    - `cd sampleApps/express` 
+     - `cd sampleApps/express` 
   
-    - `npm ci`
+     - `npm ci`
   
-    - `cd ../../`
+     - `cd ../../`
   
-    - `npm run express-sample`
+     - `npm run express-sample`
     
-      - Or `npm run sample3`
+       - Or `npm run sample3`
     
-      - Or `cd` into `sampleApps/express` and run `npm ci` and `npm start`
+       - Or `cd` into `sampleApps/express` and run `npm ci` and `npm start`
   
-  - Go to [http://localhost:3000](http://localhost:3000)
+   - Go to [http://localhost:3000](http://localhost:3000)
 
 ## API
 
