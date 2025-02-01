@@ -165,7 +165,7 @@ There are 3 sample apps you can run to see demos of how `single-page-express` ca
 
 3. Express-based sample app:
 
-- This is a full Express app that demos sharing routes and templates on the backend and frontend.
+   - This is a full Express app that demos sharing routes and templates on the backend and frontend.
 
    - To run it:
   
