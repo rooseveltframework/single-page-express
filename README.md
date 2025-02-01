@@ -42,8 +42,6 @@ The package is distributed with the following builds available:
 
 - `dist/single-page-express.min.mjs`: Minified ES module.
 
-- 
-
 Then, in your frontend code:
 
 ```javascript
