@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="format-detection" content="telephone=no">
+    <title>Sample app for single-page-express</title>
+    <script src="single-page-express.js" defer></script>
+    <script src="index.js" defer></script>
+  </head>
+<body>
+  <p>Open the browser console to see logs that illustrate how the single page app is handling navigation events.</p>
+  <ul>
+    <li><a href='/'>Homepage (/)</a></li>
+    <li><a href='/testlink2'>/testlink2</a></li>
+    <li><a href='/testlink2?with=query&params=too'>/testlink2?with=query&amp;params=too</a></li>
+    <li><a href='/test/foo/bar'>/test/:with/:params</a></li>
+    <li><a href='/wildcard/something'>/wildcard/*</a></li>
+    <li><a href='https://github.com/rooseveltframework/single-page-express'>External link that won't be handled by the router</a></li>
+  </ul>
+  <form action="/testform" method="post">
+    <p>Form that will be handled by the router.</p>
+    <input type="text" name="sometext">
+    <button type="submit" name="submit">Submit</button>
+  </form>
+  <form action="https://github.com/rooseveltframework/single-page-express" method="get">
+    <p>Form with an action to an external site that won't be handled by the router.</p>
+    <input type="text" name="sometext">
+    <button type="submit" name="submit">Submit</button>
+  </form>
+</body>
+</html>
