@@ -19,7 +19,7 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
-    "path-to-regexp": "0.1.12",
+    "path-to-regexp": "0.2.5",
     "path-to-regexp-express4": "npm:path-to-regexp@0.1.12",
     "topbar": "3.0.0"
   },
