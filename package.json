@@ -8,7 +8,7 @@
       "url": "https://github.com/rooseveltframework/single-page-express/graphs/contributors"
     }
   ],
-  "version": "1.0.1",
+  "version": "1.0.2",
   "files": [
     "dist"
   ],
@@ -19,7 +19,7 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
-    "path-to-regexp": "0.1.12",
+    "path-to-regexp": "8.2.0",
     "path-to-regexp-express4": "npm:path-to-regexp@0.1.12",
     "topbar": "3.0.0"
   },

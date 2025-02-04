@@ -392,6 +392,19 @@ function singlePageExpress (options) {
   // app.render implements the express api on the surface, then prescribes some default behavior specific to this module, provides a default method for dom manipulation, and allows for a user to override the default dom manipulation behaviors
   app.render = function (template, model, callback) {
     model = model || {}
+
+    // clear all `this` variables so they do not persist but store local copies for this method invocation's use
+    const thisTitle = this.title
+    const thisBeforeRender = this.beforeRender
+    const thisTarget = this.target
+    const thisUpdateDelay = this.updateDelay
+    const thisAfterRender = this.afterRender
+    this.title = null
+    this.beforeRender = null
+    this.target = null
+    this.updateDelay = null
+    this.afterRender = null
+
     if (options.renderMethod) {
       // execute user-supplied render method if it is provided
       options.renderMethod(template, model, callback)
@@ -442,9 +455,9 @@ function singlePageExpress (options) {
 
           if (!err) {
             // replace title tag with the new one
-            if (this.title) { // check if res.title is set
+            if (thisTitle) { // check if res.title is set
               if (document.querySelector('title')) { // check if the title element exists
-                document.querySelector('title').innerHTML = this.title // replace the page title with the new title from this.title
+                document.querySelector('title').innerHTML = thisTitle // replace the page title with the new title from res.title
               }
             } else if (doc.querySelector('title') && document.querySelector('title')) { // otherwise check if a <title> tag exists in the template
               document.querySelector('title').innerHTML = doc.querySelector('title').innerHTML // if so, replace the page title with the new title from the <title> tag
@@ -453,12 +466,12 @@ function singlePageExpress (options) {
             // call app.beforeEveryRender function if it exists
             if (app.beforeEveryRender && typeof app.beforeEveryRender === 'function') app.beforeEveryRender(model) // e.g. document.body.style.opacity = 0
 
-            // call this.beforeRender function if it exists
-            if (this.beforeRender && typeof this.beforeRender === 'function') this.beforeRender(model) // e.g. document.body.style.opacity = 0
+            // call res.beforeRender function if it exists
+            if (thisBeforeRender && typeof thisBeforeRender === 'function') thisBeforeRender(model) // e.g. document.body.style.opacity = 0
 
             // update DOM
             window.setTimeout(function () {
-              const target = this.target || app.defaultTarget // check if a target is set
+              const target = thisTarget || app.defaultTarget // check if a target is set
               if (target) {
                 if (document.querySelector(target)) { // check if the target is a valid DOM element
                   if (doc.querySelector(target)) { // if the new template has an element with the same id as the target container, then that's the container we're writing to
@@ -484,9 +497,9 @@ function singlePageExpress (options) {
               // call app.afterEveryRender function if it exists
               if (app.afterEveryRender && typeof app.afterEveryRender === 'function') app.afterEveryRender(model) // e.g. document.body.style.opacity = 1
 
-              // call this.afterRender function if it exists
-              if (this.afterRender && typeof this.afterRender === 'function') this.afterRender(model) // e.g. document.body.style.opacity = 1
-            }, parseInt(this.updateDelay) || parseInt(app.updateDelay) || 0)
+              // call res.afterRender function if it exists
+              if (thisAfterRender && typeof thisAfterRender === 'function') thisAfterRender(model) // e.g. document.body.style.opacity = 1
+            }, parseInt(thisUpdateDelay) || parseInt(app.updateDelay) || 0)
           }
         }
       }
