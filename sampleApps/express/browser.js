@@ -1,5 +1,5 @@
 const singlePageExpress = require('../../single-page-express') // use require('./node_modules/single-page-express/dist/single-page-express.cjs') in your app
-const teddy = require('./node_modules/teddy/dist/teddy.client.cjs')
+const teddy = require('teddy/client')
 
 // start single-page-express
 const app = singlePageExpress({

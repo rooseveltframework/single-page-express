@@ -32,11 +32,11 @@ First, install `single-page-express` from npm.
 
 The package is distributed with the following builds available:
 
-- `dist/single-page-express.cjs`: CommonJS bundle.
+- `dist/single-page-express.cjs`: CommonJS bundle: `const singlePageExpress = require('single-page-express')`
 - `dist/single-page-express.js`: Standalone bundle that can be included via `<script>` tags.
 - `dist/single-page-express.min.js`: Minified standalone bundle that can be included via `<script>` tags.
-- `dist/single-page-express.mjs`: ES module.
-- `dist/single-page-express.min.mjs`: Minified ES module.
+- `dist/single-page-express.mjs`: ES module: `import singlePageExpress from 'single-page-express'`
+- `dist/single-page-express.min.mjs`: Minified ES module: `import singlePageExpress from 'single-page-express/min'`
 
 Then, in your frontend code:
 
@@ -54,12 +54,12 @@ Once those variables are defined, you can call the `single-page-express` constru
 Below is an example using Teddy for templating and defining two simple templates.
 
 ```javascript
-const templatingEngine = require('./node_modules/teddy/dist/teddy.client.cjs')
+const templatingEngine = require('teddy/client')
 const templates = {
   index: '<p>hello world</p>',
   secondPage: '<p>this page has a {variable} in it</p>'
 }
-const app = require('./node_modules/single-page-express/dist/single-page-express.cjs')({
+const app = require('single-page-express')({
   templatingEngine,
   templates
 })
@@ -148,7 +148,7 @@ There are 3 sample apps you can run to see demos of how `single-page-express` ca
 3. Express-based sample app:
    - This is a full Express app that demos sharing routes and templates on the backend and frontend.
    - To run it:
-     - `cd sampleApps/express` 
+     - `cd sampleApps/express`
      - `npm ci`
      - `cd ../../`
      - `npm run express-sample`
