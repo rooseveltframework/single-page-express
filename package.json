@@ -8,10 +8,19 @@
       "url": "https://github.com/rooseveltframework/single-page-express/graphs/contributors"
     }
   ],
-  "version": "1.0.2",
+  "version": "1.0.3",
   "files": [
     "dist"
   ],
+  "exports": {
+    ".": {
+      "import": "./dist/single-page-express.mjs",
+      "require": "./dist/single-page-express.cjs"
+    },
+    "./min": {
+      "default": "./dist/single-page-express.min.mjs"
+    }
+  },
   "homepage": "https://github.com/rooseveltframework/single-page-express",
   "license": "CC-BY-4.0",
   "main": "single-page-express.js",
@@ -31,7 +40,7 @@
     "express": "4.21.2",
     "mocha": "11.1.0",
     "standard": "17.1.2",
-    "teddy": "0.6.20",
+    "teddy": "0.6.21",
     "webpack": "5.97.1",
     "webpack-cli": "6.0.1"
   },
