@@ -100,12 +100,12 @@ app.route('/route/:with/:params').get(function (req, res) {
   res.render('someTemplate', { some: 'model' })
 })
 
-// route with expess 4 wildcard syntax
+// route with express 4 wildcard syntax
 app.route('*').get(function (req, res) {
   res.render('someTemplate', { some: 'model' })
 })
 
-// route with expess 5 wildcard syntax
+// route with express 5 wildcard syntax
 app.route('*:all').get(function (req, res) {
   res.render('someTemplate', { some: 'model' })
 })
