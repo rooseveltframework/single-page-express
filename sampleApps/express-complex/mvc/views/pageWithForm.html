@@ -1,0 +1,18 @@
+<include src="layout">
+  <arg pageContent>
+    <p>page with a form</p>
+    <form action="/pageWithForm" method="post">
+      <if first_name>
+        <p>You said your first name is: {first_name}</p>
+      </if>
+      <dl>
+        <dt><label for="first_name">First name:</label></dt>
+        <dd><input type="text" name="first_name" id="first_name" if-first_name true='value="{first_name}"' false='value=""'></dd>
+      </dl>
+      <menu>
+        <li><button type="submit" name="button1">Button 1</button></li>
+        <li><button type="submit" name="button2">Button 2</button></li>
+      </menu>
+    </form>
+  </arg>
+</include>

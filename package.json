@@ -8,7 +8,7 @@
       "url": "https://github.com/rooseveltframework/single-page-express/graphs/contributors"
     }
   ],
-  "version": "1.0.3",
+  "version": "1.1.0",
   "files": [
     "dist"
   ],
@@ -24,36 +24,19 @@
   "homepage": "https://github.com/rooseveltframework/single-page-express",
   "license": "CC-BY-4.0",
   "main": "single-page-express.js",
-  "engines": {
-    "node": ">=18.0.0"
-  },
   "dependencies": {
     "path-to-regexp": "8.2.0",
     "path-to-regexp-express4": "npm:path-to-regexp@0.1.12",
     "topbar": "3.0.0"
   },
   "devDependencies": {
-    "c8": "10.1.3",
+    "@playwright/test": "1.50.1",
     "codecov": "3.8.3",
-    "eslint": "9.19.0",
-    "eslint-plugin-mocha": "10.5.0",
     "express": "4.21.2",
-    "mocha": "11.1.0",
+    "html-validate": "9.3.0",
     "standard": "17.1.2",
     "teddy": "0.6.21",
-    "webpack": "5.97.1",
     "webpack-cli": "6.0.1"
-  },
-  "eslintConfig": {
-    "parserOptions": {
-      "ecmaVersion": 2020
-    },
-    "plugins": [
-      "mocha"
-    ],
-    "rules": {
-      "mocha/no-exclusive-tests": "error"
-    }
   },
   "scripts": {
     "build": "webpack",
@@ -63,17 +46,29 @@
     "sample2": "npm run sample-app-basic-frontend-only-with-templating",
     "express-sample": "node -e \"process.chdir('sampleApps/express'); require('./sampleApps/express/server.js')\"",
     "sample3": "npm run express-sample",
-    "lint": "standard && eslint test/test.js",
+    "express-complex": "node -e \"process.chdir('sampleApps/express-complex'); require('./sampleApps/express-complex/server.js')\"",
+    "sample4": "npm run express-complex",
+    "lint": "standard",
     "lint-fix": "standard --fix",
-    "codecov": "codecov",
-    "coverage": "c8 --reporter=text --reporter=lcov mocha test/*.js --test",
-    "test": "mocha test/*.js",
-    "test-debug": "mocha --inspect-brk test/*.js"
+    "test": "npm run build && playwright test"
+  },
+  "standard": {
+    "ignore": [
+      "dist/"
+    ]
   },
   "repository": {
     "type": "git",
     "url": "git://github.com/rooseveltframework/single-page-express.git"
   },
-  "keywords": [],
+  "keywords": [
+    "single page app",
+    "SPA",
+    "SPE",
+    "express",
+    "express.js",
+    "router",
+    "frontend router"
+  ],
   "funding": "https://www.paypal.com/donate/?hosted_button_id=2L2X8GRXZCGJ6"
 }
