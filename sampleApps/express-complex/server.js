@@ -30,6 +30,8 @@ for (const file of fileList) {
   templates[file.slice(0, -5)] = templateCode // key is the file name with no file extension
 }
 fs.writeFileSync('public/templates.js', `module.exports = ${JSON.stringify(templates)}`)
+fs.writeFileSync('public/extra.css', `body { }`)
+fs.writeFileSync('public/extra.js', `console.log('extra script loaded!')`)
 
 // bundle frontend js
 const webpack = require('webpack')

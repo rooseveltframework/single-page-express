@@ -2,7 +2,7 @@
 
 [![npm](https://img.shields.io/npm/v/single-page-express.svg)](https://www.npmjs.com/package/single-page-express)
 
-A client-side implementation of the [Express](http://expressjs.com) route API. It works by hijacking links and form submits, then providing a direct imitation of the Express route API to handle "requests" (click or submit events) and issue "responses" in the form of DOM updates. It will update the browser history to match the route accordingly and there are hooks available for setting animations as well.
+A client-side implementation of the [Express](http://expressjs.com) route API. It works by hijacking links and form submits, then providing a direct imitation of the Express route API to handle "requests" (click or submit events) and issue "responses" in the form of DOM updates. It will update the browser history to match the route accordingly, update the scroll position appropriately, and there are hooks available for setting animations as well.
 
 This allows you to write isomorphic (aka universal, [amphibious](https://twitter.com/kethinov/status/566896168324825088), etc) router code that can be shared verbatim on the client and the server in your Express application.
 
@@ -24,17 +24,21 @@ This module was built and is maintained by the [Roosevelt web framework](https:/
 
 - Like Express, this module is unopinionated about what templating engine you use for rendering HTML templates. Use any templating engine that supports Express.
 
+- The default render method includes many smart defaults, including easy hooks for setting the page title, updating children of the `<head>` tag, automatic support for announcing template renders as new pages to screen readers, setting browser focus to the correct element, and more. The specifics of the default render method's behavior are detailed below, and you can replace the default render method with your own if you prefer different behavior.
+
 Don't build a SPA (single page app), build a SPE (single page Express) app!
 
 ## Usage
+
+### Loading single-page-express into your app
 
 First, install `single-page-express` from npm.
 
 The package is distributed with the following builds available:
 
 - `dist/single-page-express.cjs`: CommonJS bundle: `const singlePageExpress = require('single-page-express')`
-- `dist/single-page-express.js`: Standalone bundle that can be included via `<script>` tags.
-- `dist/single-page-express.min.js`: Minified standalone bundle that can be included via `<script>` tags.
+- `dist/single-page-express.js`: Standalone bundle that can be included via `<script>` tags. Declares a global variable: `singlePageExpress`
+- `dist/single-page-express.min.js`: Minified standalone bundle that can be included via `<script>` tags. Declares a global variable: `singlePageExpress`
 - `dist/single-page-express.mjs`: ES module: `import singlePageExpress from 'single-page-express'`
 - `dist/single-page-express.min.mjs`: Minified ES module: `import singlePageExpress from 'single-page-express/min'`
 
@@ -65,7 +69,11 @@ const app = require('single-page-express')({
 })
 ```
 
-Then define routes:
+### Defining routes
+
+The various methods of defining routes [like you would with Express](https://expressjs.com/en/guide/routing.html) are supported.
+
+A simple example:
 
 ```javascript
 app.route('/').get(function (req, res) {
@@ -78,8 +86,6 @@ app.route('/secondPage').get(function (req, res) {
   })
 })
 ```
-
-The various methods of defining routes [like you would with Express](https://expressjs.com/en/guide/routing.html) are supported.
 
 Some more examples:
 
@@ -125,11 +131,18 @@ Params accepted by `app.triggerRoute` include:
 - `method`: e.g. GET, POST, etc. (Case insensitive.)
 - `body`: What to supply to `req.body` if you're triggering a POST.
 
-## Running the sample apps
+### Controlling scroll position behavior
+
+By default, `single-page-express` will remember the scroll position of pages that have been visited. It will also remember the scroll position of child containers on each page as well, but only if those containers have assigned `id` attributes.
+
+If you wish to not remember the scroll position on a per route basis, supply `res.resetScroll = true` in your route. To disable this memory app-wide, set the `alwaysScrollTop` param to `true` in the constructor.
+
+### Running the sample apps
 
 There are 3 sample apps you can run to see demos of how `single-page-express` can be used:
 
 1. Basic frontend-only sample app:
+   
    - This is a minimalist demo of `single-page-express` that just demos various kinds of routes working as expected, but does not wire up any templating system or do anything other than log data to the console when the render method is called.
    - To run it:
      - `npm ci`
@@ -138,6 +151,7 @@ There are 3 sample apps you can run to see demos of how `single-page-express` ca
      - Go to http://localhost:3000
 
 2. Basic frontend-only sample app with templating:
+   
    - Similar to the above demo, but includes a templating engine and demos page navigation in the single page app context.
    - To run it:
      - `npm ci`
@@ -146,6 +160,7 @@ There are 3 sample apps you can run to see demos of how `single-page-express` ca
    - Go to [http://localhost:3000](http://localhost:3000)
 
 3. Express-based sample app:
+   
    - This is a full Express app that demos sharing routes and templates on the backend and frontend.
    - To run it:
      - `cd sampleApps/express`
@@ -156,6 +171,18 @@ There are 3 sample apps you can run to see demos of how `single-page-express` ca
        - Or `cd` into `sampleApps/express` and run `npm ci` and `npm start`
    - Go to [http://localhost:3000](http://localhost:3000)
 
+4. More complex Express-based sample app:
+   
+   - Similar to the previous one but tests more features of `single-page-express`. This app exists mainly for the automated tests, but you can use it as a template for your app too if you like.
+   - To run it:
+     - `cd sampleApps/express-complex`
+     - `npm ci`
+     - `cd ../../`
+     - `npm run express-express-complex`
+       - Or `npm run sample4`
+       - Or `cd` into `sampleApps/express-complex` and run `npm ci` and `npm start`
+   - Go to [http://localhost:3000](http://localhost:3000)
+
 ## API
 
 ### Default render method behavior
@@ -163,9 +190,21 @@ There are 3 sample apps you can run to see demos of how `single-page-express` ca
 The default render method will handle both full page renders as well as rendering partials:
 
 - If you set `res.title`, the page's title will be updated with its contents. Alternatively, if the template render output contains a `<title>` tag, the page's title will be updated with its contents.
+  - When the new page is rendered, it will be announced to screen readers. The content to read to screen readers will be sourced from one of the following querySelectors: `h1[aria-label]`, `h1`, or `title` in that order.
+- If the template render contains an `<html>` or `<head>` tag and there are new attributes on the `<html>` or `<head>` tags that aren't present in the current document, those attributes will be set on the current document. This behavior is additive or replacement-level only. Attributes cannot be removed simply by omitting them in the template render. If you want to remove an attribute, do it with JavaScript, or set it to a different value in your template render.
+- If there are any new children for the `<head>` in the template render, they will be inserted into the current document's `<head>` tag if they are not present already.
+  - If any of the new tags are `<link>` or `<script>` tags, the DOM update will be delayed until those external files load to prevent a [flash of unstyled content](https://en.wikipedia.org/wiki/Flash_of_unstyled_content).
+  - If you set `res.removeMetaTags`, all `<meta>` tags will be removed from the `<head>` before adding any new ones.
+  - If you set `res.removeStyleTags`, all `<style>` tags will be removed from the `<head>` before adding any new ones.
+  - If you set `res.removeLinkTags`, all `<link>` tags will be removed from the `<head>` before adding any new ones.
+  - If you set `res.removeScriptTags`, all `<script>` tags will be removed from the `<head>` before adding any new ones.
+  - If you set `res.removeBaseTags`, all `<base>` tags will be removed from the `<head>` before adding any new ones.
+  - If you set `res.removeTemplateTags`, all `<template>` tags will be removed from the `<head>` before adding any new ones.
+  - If you set `res.removeHeadTags`, all tags except `<title>` will be removed from the `<head>` before adding any new ones.
 - If you set `res.target`, the DOM will be updated at that spot. `res.target` is a query selector, so an example value you could give it would be `#my-container`. That would replace the contents of the element with the id "my-container" with the output of your rendered template.
-- If the output of your rendered template also has an element matching the same query selector, then the contents of that portion of the output will be all that is used to replace the target.
-- If you do not set `res.target`, the contents of the `<body>` tag will be replaced with the output of your rendered template.
+  - If the output of your rendered template also has an element matching the same query selector, then the contents of that portion of the output will be all that is used to replace the target.
+  - If you do not set `res.target`, the contents of the `<body>` tag will be replaced with the output of your rendered template.
+- If you set `res.focus`, the browser's focus will be set to that element after the page is rendered. If you do not set `res.focus`, then the browser's focus will be set to the first non-inert element in the DOM with the `autofocus` attribute, or, if none are present, it will be set to whatever the target element was set to for the DOM update.
 - There are also hooks for setting animations as well. See "Hooks for setting animations" below.
 
 If this DOM manipulation behavior is undesirable to you, you can supply your own render method instead and do whatever you like. To supply your own render method, see the constructor parameter documentation below.
@@ -180,6 +219,8 @@ If this DOM manipulation behavior is undesirable to you, you can supply your own
 - `renderMethod(template, model callback)`: Optionally supply a function to execute when `res.render` is called in your routes. If you do not provide one, a default one will be used that will render your template with your chosen templating engine and make appropriate updates to the DOM. See below for details about what the default render method does specifically and how to customize its behavior.
 - `disableTopbar`: Disable the [top bar](https://buunguyen.github.io/topbar/) loading bar. Default: `false` (the loading bar is enabled by default)
 - `topbarConfig`: Options to supply to [top bar](https://buunguyen.github.io/topbar/) to customize its aesthetics and behavior. See the site's documentation for a list of options.
+- `topBarRoutes`: Which routes to use [top bar](https://buunguyen.github.io/topbar/) on. Defaults to all if this option is not supplied.
+- `alwaysScrollTop`: Always scroll to the top of the page after every render. Default: `false` (the default render method will remember the scroll position of each page visited and restore that scroll position when you revisit those pages)
 
 #### Customizing the default render method's behavior
 
@@ -196,7 +237,9 @@ These constructor params are only relevant if you're not supplying a custom rend
 ##### Post-render
 
 - `afterEveryRender(model)`: Optionally supply a function to execute just after your template is rendered and written to the DOM. Useful for finishing a CSS transition.
+  
   - You can also set `res.afterRender(model)` on a per request basis.
+
 - `postRenderCallbacks`: Optionally supply an object with keys that are template names and values that are functions to execute after that template renders. You can also supply `*` as a key to execute a post-render callback after every template render.
 
 ### Application object
@@ -206,6 +249,7 @@ When you call the constructor, it will return an `app` object.
 #### Properties
 
 - `afterEveryRender`: Function to execute after every template render sourced from the constructor params.
+- `alwaysScrollTop`: If true, the app will not remember scroll position on a per-page basis.
 - `appVars`: List of variables stored via `app.set()` and retrieved with `app.get()`.
 - `beforeEveryRender`: Function to execute before every template render sourced from the constructor params.
 - `defaultTarget`: Query string representing the default element to target if one is not supplied by `res.target`.
@@ -216,7 +260,9 @@ When you call the constructor, it will return an `app` object.
 - `templates`: List of templates loaded into into `single-page-express` sourced from the constructor params.
 - `templatingEngine`: The templating engine module loaded into `single-page-express` sourced from the constructor params.
 - `topbarEnabled`: Whether or not the top loading bar is enabled.
+- `topbarRoutes`: Which routes to use the top loading bar on; defaults to all if this option is not supplied.
 - `updateDelay`: How long to wait before rendering a template sourced from constructor params.
+- `urls`: List of URLs that have been visited and metadata about them.
 
 ## Express API implementation
 
@@ -317,6 +363,10 @@ All Express request object methods are **stubbed out** but do nothing because be
 
 Likewise all other `req` methods [from the Node.js API](https://nodejs.org/api/http.html#class-httpserverresponse) are **not supported**. They are uncommonly used in Express applications, so they are not even stubbed out. See [feature request](https://github.com/rooseveltframework/single-page-express/issues/6).
 
+#### New properties defined by single-page-express
+
+- `req.singlePageExpress`: This property will always be set to `true`. You can use it to detect whether your route is executing in the `single-page-express` context or not.
+
 ### Response object
 
 #### Properties
@@ -331,9 +381,18 @@ Likewise all other `req` methods [from the Node.js API](https://nodejs.org/api/h
 
 - `res.afterRender(model)`: If using the default render method, you can set this to a function that will execute after every render.
 - `res.beforeRender(model)` If using the default render method, you can set this to a function that will execute before every render.
+- `res.focus`: If using the default render method, if you set `res.focus`, the browser's focus will be set to that element after the page is rendered. If you do not set `res.focus`, then the browser's focus will be set to the first non-inert element in the DOM with the `autofocus` attribute, or, if none are present, it will be set to whatever the target element was set to for the DOM update.
+- `res.removeBaseTags`: If using the default render method, this will remove any `<base>` tags from the page before doing the DOM update.
+- `res.removeHeadTags`: If using the default render method, this will remove all children of the `<head>` tag except the title element from the page before doing the DOM update.
+- `res.removeLinkTags`: If using the default render method, this will remove any `<link>` tags from the page before doing the DOM update.
+- `res.removeMetaTags`: If using the default render method, this will remove any `<meta>` tags from the page before doing the DOM update.
+- `res.removeScriptTags`: If using the default render method, this will remove any `<script>` tags from the page before doing the DOM update.
+- `res.removeStyleTags`: If using the default render method, this will remove any `<style>` tags from the page before doing the DOM update.
+- `res.removeTemplateTags`: If using the default render method, this will remove any `<template>` tags from the page before doing the DOM update.
 - `res.target`: If using the default render method, use this variable to set a query selector to determine which element's contents will be replaced by your template render's contents. If none is supplied, the `<body>` tag's contents will be replaced.
 - `res.title`: If using the default render method, use this variable to set a page title for the new render.
-- `res.updateDelay`: If using the default render method, use this variable to set a delay in milliseconds before the render occurs.
+- `res.updateDelay`: If using the default render method, use this variable to set a delay in milliseconds before the render occurs. If not using the default render method, this property will still allow you to specify a delay before resetting the scroll position.
+- `res.resetScroll`: Purges the memory of the scroll position for this route so that scroll position is reset to the top for this page and all its child containers.
 
 #### Methods
 

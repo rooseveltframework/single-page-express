@@ -9,8 +9,32 @@
       #page-contents {
         transition: opacity 0.2s ease;
       }
+      nav {
+        background-color: #ccc;
+        border: 1px #666 solid;
+        position: fixed;
+        z-index: 2;
+      }
+      nav ul {
+        padding: 0 15px;
+      }
+      nav li {
+        display: inline-block;
+      }
+      nav li:after {
+        content: " | ";
+      }
+      nav li:last-of-type::after {
+        content: "";
+      }
+      p {
+        z-index: 1;
+      }
     </style>
     <script src="/bundle.js" defer></script>
+    <if additionalHeadTags>
+      {additionalHeadTags|s}
+    </if>
   </head>
 <body>
   <p>Open the browser console to see logs that illustrate how the single page app is handling navigation events.</p>
@@ -20,6 +44,11 @@
       <li><a href="/secondPage">Second page</a></li>
       <li><a href="/pageWithForm">Page with form</a></li>
       <li><a href="/pageWithDataRetrieval">Page with data retrieval from the server</a></li>
+      <li><a href="/pageWithTitleOverride">Page with title override using `res.title`</a></li>
+      <li><a href="/routeUsingTarget">Route targeting a specific DOM element using `res.target`</a></li>
+      <li><a href="/route/with/params">Route with params</a></li>
+      <li><a href="/verbosePage">Verbose page</a></li>
+      <li><a href="/additionalHeadTags">Additional `head` tags</a></li>
     </ul>
   </nav>
   <article id="page-contents">
