@@ -5,7 +5,7 @@
     "express": "4.21.2",
     "module-alias": "2.2.3",
     "teddy": "0.6.21",
-    "webpack": "5.97.1"
+    "webpack": "5.98.0"
   },
   "_moduleAliases": {
     "models": "mvc/models/server"
