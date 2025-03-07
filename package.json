@@ -35,7 +35,7 @@
     "express": "4.21.2",
     "html-validate": "9.3.0",
     "standard": "17.1.2",
-    "teddy": "0.6.21",
+    "teddy": "0.6.26",
     "webpack-cli": "6.0.1"
   },
   "scripts": {
