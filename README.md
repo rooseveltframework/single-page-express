@@ -1,6 +1,7 @@
 # single-page-express
 
-[![npm](https://img.shields.io/npm/v/single-page-express.svg)](https://www.npmjs.com/package/single-page-express)
+[![Build Status](https://github.com/rooseveltframework/single-page-express/workflows/CI/badge.svg
+)](https://github.com/rooseveltframework/single-page-express/actions?query=workflow%3ACI) [![npm](https://img.shields.io/npm/v/single-page-express.svg)](https://www.npmjs.com/package/single-page-express)
 
 A client-side implementation of the [Express](http://expressjs.com) route API. It works by hijacking links and form submits, then providing a direct imitation of the Express route API to handle "requests" (click or submit events) and issue "responses" in the form of DOM updates. It will update the browser history to match the route accordingly, update the scroll position appropriately, and there are hooks available for setting animations as well.
 
@@ -142,7 +143,7 @@ If you wish to not remember the scroll position on a per route basis, supply `re
 There are 3 sample apps you can run to see demos of how `single-page-express` can be used:
 
 1. Basic frontend-only sample app:
-   
+
    - This is a minimalist demo of `single-page-express` that just demos various kinds of routes working as expected, but does not wire up any templating system or do anything other than log data to the console when the render method is called.
    - To run it:
      - `npm ci`
@@ -151,7 +152,7 @@ There are 3 sample apps you can run to see demos of how `single-page-express` ca
      - Go to http://localhost:3000
 
 2. Basic frontend-only sample app with templating:
-   
+
    - Similar to the above demo, but includes a templating engine and demos page navigation in the single page app context.
    - To run it:
      - `npm ci`
@@ -160,7 +161,7 @@ There are 3 sample apps you can run to see demos of how `single-page-express` ca
    - Go to [http://localhost:3000](http://localhost:3000)
 
 3. Express-based sample app:
-   
+
    - This is a full Express app that demos sharing routes and templates on the backend and frontend.
    - To run it:
      - `cd sampleApps/express`
@@ -172,7 +173,7 @@ There are 3 sample apps you can run to see demos of how `single-page-express` ca
    - Go to [http://localhost:3000](http://localhost:3000)
 
 4. More complex Express-based sample app:
-   
+
    - Similar to the previous one but tests more features of `single-page-express`. This app exists mainly for the automated tests, but you can use it as a template for your app too if you like.
    - To run it:
      - `cd sampleApps/express-complex`
@@ -237,7 +238,7 @@ These constructor params are only relevant if you're not supplying a custom rend
 ##### Post-render
 
 - `afterEveryRender(model)`: Optionally supply a function to execute just after your template is rendered and written to the DOM. Useful for finishing a CSS transition.
-  
+
   - You can also set `res.afterRender(model)` on a per request basis.
 
 - `postRenderCallbacks`: Optionally supply an object with keys that are template names and values that are functions to execute after that template renders. You can also supply `*` as a key to execute a post-render callback after every template render.
