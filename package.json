@@ -1,6 +1,6 @@
 {
   "name": "single-page-express",
-  "description": "A client-side implementation of the Express route API.",
+  "description": "📄 A client-side implementation of the Express route API. ",
   "author": "Roosevelt Framework Team <rooseveltframework@gmail.com>",
   "contributors": [
     {
@@ -30,12 +30,11 @@
     "topbar": "3.0.0"
   },
   "devDependencies": {
-    "@playwright/test": "1.50.1",
-    "codecov": "3.8.3",
+    "@playwright/test": "1.51.0",
     "express": "4.21.2",
-    "html-validate": "9.3.0",
+    "html-validate": "9.5.0",
     "standard": "17.1.2",
-    "teddy": "0.6.21",
+    "teddy": "0.6.26",
     "webpack-cli": "6.0.1"
   },
   "scripts": {
@@ -54,7 +53,9 @@
   },
   "standard": {
     "ignore": [
-      "dist/"
+      "dist/",
+      "sampleApps/express/public",
+      "sampleApps/express-complex/public"
     ]
   },
   "repository": {
