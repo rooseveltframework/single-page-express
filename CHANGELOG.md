@@ -4,6 +4,11 @@
 
 - Put your changes here...
 
+## 1.1.1
+
+- Fixed crash related to unfinished HTML validation feature.
+- Updated dependencies.
+
 ## 1.1.0
 
 - Added feature which will allow `single-page-express` to remember the scroll position of pages that have been visited. It will also remember the scroll position of child containers on each page as well, but only if those containers have assigned `id` attributes.

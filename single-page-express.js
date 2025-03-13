@@ -500,6 +500,7 @@ function singlePageExpress (options) {
         try {
           markup = app.templatingEngine.render(template, model)
           // TODO: leverage https://html-validate.org/ — will need to be a peer dep
+          // add html-validate to devDependencies
           // const htmlValidate = require('./node_modules/html-validate/dist/cjs/browser.js')
           // console.log(htmlValidate)
           // this seems to crash webpack for some reason
