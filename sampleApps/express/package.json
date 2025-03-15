@@ -4,7 +4,7 @@
   "dependencies": {
     "express": "4.21.2",
     "module-alias": "2.2.3",
-    "teddy": "1.0.0",
+    "teddy": "1.0.1",
     "webpack": "5.98.0"
   },
   "_moduleAliases": {
