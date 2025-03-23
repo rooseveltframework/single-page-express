@@ -5,54 +5,32 @@
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="format-detection" content="telephone=no">
     <title>Sample app for single-page-express</title>
-    <style>
-      #page-contents {
-        transition: opacity 0.2s ease;
-      }
-      nav {
-        background-color: #ccc;
-        border: 1px #666 solid;
-        position: fixed;
-        z-index: 2;
-      }
-      nav ul {
-        padding: 0 15px;
-      }
-      nav li {
-        display: inline-block;
-      }
-      nav li:after {
-        content: " | ";
-      }
-      nav li:last-of-type::after {
-        content: "";
-      }
-      p {
-        z-index: 1;
-      }
-    </style>
+    <link rel="stylesheet" href="/styles.css">
     <script src="/bundle.js" defer></script>
     <if additionalHeadTags>
       {additionalHeadTags|s}
     </if>
   </head>
 <body>
+  <header data-page-title> <!--! the data-page-title attribute makes sure the textContent of this element is read to screen readers -->
+    <h1>Sample app for single-page-express</h1>
+    <p hidden>—</p> <!--! this puts a dash between the textContent of the <h1> and the <h2> for screen readers -->
+    <h2>{pageTitle}</h2>
+  </header>
   <p>Open the browser console to see logs that illustrate how the single page app is handling navigation events.</p>
   <nav>
     <ul>
       <li><a href="/">Homepage</a></li>
+      <li><a href="/pageWithTitleOverride">Homepage `res.title` test</a></li>
       <li><a href="/secondPage">Second page</a></li>
       <li><a href="/pageWithForm">Page with form</a></li>
       <li><a href="/pageWithDataRetrieval">Page with data retrieval from the server</a></li>
-      <li><a href="/pageWithTitleOverride">Page with title override using `res.title`</a></li>
       <li><a href="/routeUsingTarget">Route targeting a specific DOM element using `res.target`</a></li>
       <li><a href="/route/with/params">Route with params</a></li>
       <li><a href="/verbosePage">Verbose page</a></li>
       <li><a href="/additionalHeadTags">Additional `head` tags</a></li>
     </ul>
   </nav>
-  <article id="page-contents">
-    {pageContent|s}
-  </article>
+  {pageContent|s}
 </body>
 </html>

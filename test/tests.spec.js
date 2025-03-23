@@ -24,7 +24,7 @@ test.beforeEach(async ({ page }) => {
 
 test('should render the homepage correctly', async ({ page }) => {
   await page.goto('/')
-  const resultText = await page.textContent('#page-contents p')
+  const resultText = await page.textContent('#homepage p')
   expect(resultText).toBe('hello world')
 })
 
@@ -32,6 +32,6 @@ test('should render the second page correctly', async ({ page }) => {
   await page.goto('/')
   await page.click('a[href="/secondPage"]')
   await page.waitForTimeout(2000)
-  const resultText = await page.textContent('#page-contents p')
+  const resultText = await page.textContent('#secondPage p')
   expect(resultText).toBe('this is a second page and prints a variable with contents: "hi there!"')
 })
