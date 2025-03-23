@@ -27,7 +27,7 @@ module.exports = function (app) {
   })
 
   app.get('/routeUsingTarget', (req, res) => {
-    res.target = '#page-contents'
+    res.target = 'body > article > *:first-child'
     if (req.singlePageExpress) res.render('partial', {})
     else res.redirect('/')
   })

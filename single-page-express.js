@@ -15,10 +15,11 @@ function singlePageExpress (options) {
   app.routes = {} // list of functions to execute when trying to see if this route matches one of the known patterns indexed by original route method#string
   app.routeCallbacks = {} // list of functions to execute when the route is invoked
   app.defaultTarget = options.defaultTarget // which element to replace by default
+  app.defaultTargets = app.defaultTarget ? [app.defaultTarget].concat(options.defaultTargets || []) : options.defaultTargets || [] // which elements to replace by default
   app.beforeEveryRender = options.beforeEveryRender // function to execute before every DOM update if using the default render method
   app.updateDelay = options.updateDelay // how long to delay after executing app.beforeEveryRender or this.beforeRender before performing the DOM update
   app.afterEveryRender = options.afterEveryRender // function to execute after every DOM update if using the default render method
-  app.postRenderCallbacks = {} // list of callback functions to execute after a render event occurs
+  app.postRenderCallbacks = options.postRenderCallbacks || {} // list of callback functions to execute after a render event occurs
   app.topbarEnabled = !options.disableTopbar // whether to use topbar https://buunguyen.github.io/topbar/
   app.topBarRoutes = options.topBarRoutes // which routes to use the topbar on; defaults to all if this option is not supplied
   if (app.topbarEnabled || app.topBarRoutes) {
@@ -33,6 +34,7 @@ function singlePageExpress (options) {
   }
   app.alwaysScrollTop = options.alwaysScrollTop // always scroll to the top of the page after every render
   app.urls = {} // list of URLs that have been visited and metadata about them
+  let currentViewTransition // a global reference to the current view transition so we can know when it has ended
 
   // taken from https://expressjs.com/en/api.html#routing-methods
   const httpVerbs = [
@@ -347,7 +349,12 @@ function singlePageExpress (options) {
       }
 
       // alter browser history state
-      if (method === 'get' && !params.skipHistory) window.history.pushState({}, '', route)
+      if (method === 'get' && !params.skipHistory) {
+        const state = { index: historyStack.length }
+        historyStack.push(state)
+        currentIndex = historyStack.length - 1
+        window.history.pushState(state, '', route)
+      }
 
       // build request object
       const req = { ...defaultReq }
@@ -408,11 +415,28 @@ function singlePageExpress (options) {
       // attach req object to res
       res.req = req
 
+      // pass along whether the back button or forward button was pressed
+      req.backButtonPressed = params.backButtonPressed
+      req.forwardButtonPressed = params.forwardButtonPressed
+
+      // add back/forward button classes to the html element
+      const htmlEl = document.querySelector('html')
+      if (params.backButtonPressed) {
+        htmlEl.classList.add('backButtonPressed')
+        htmlEl.classList.remove('forwardButtonPressed')
+      } else if (params.forwardButtonPressed) {
+        htmlEl.classList.remove('backButtonPressed')
+        htmlEl.classList.add('forwardButtonPressed')
+      } else {
+        htmlEl.classList.remove('backButtonPressed')
+        htmlEl.classList.remove('forwardButtonPressed')
+      }
+
       // fire the event
       await app.routeCallbacks[`${method}#${match.route}`](req, res)
 
       // scroll the page appropriately
-      window.setTimeout(() => {
+      const scrollPage = () => {
         // if this page has never been visited before or res.resetScroll or app.alwaysScrollTop is present
         if (!app.urls[route] || res.resetScroll || app.alwaysScrollTop) {
           window.scrollTo(0, 0) // scroll to the top
@@ -434,7 +458,9 @@ function singlePageExpress (options) {
 
         // hide top bar (loading completed)
         if ((app.topbarEnabled && !app.topBarRoutes) || app.topBarRoutes?.includes?.(match.route)) app.topbar.hide()
-      }, parseInt(res.updateDelay) || parseInt(app.updateDelay) || 0) // delay the scroll until after the render by using the same delay mechanism as the default render method
+      }
+      if (currentViewTransition) document.addEventListener('animationend', scrollPage) // scroll the page after view transitions or css animations are done
+      else window.setTimeout(scrollPage, parseInt(res.updateDelay) || parseInt(app.updateDelay) || 0) // scroll page after user-defined animation finishes; delay the scroll until after the render by using the same delay mechanism as the default render method
     }
   }
 
@@ -446,6 +472,7 @@ function singlePageExpress (options) {
     const thisTitle = this.title
     const thisBeforeRender = this.beforeRender
     const thisTarget = this.target
+    const thisAppendTargets = this.appendTargets
     const thisFocus = this.focus
     const thisRemoveMetaTags = this.removeMetaTags
     const thisRemoveStyleTags = this.removeStyleTags
@@ -533,11 +560,22 @@ function singlePageExpress (options) {
               document.querySelector('title').innerHTML = doc.querySelector('title').innerHTML // if so, replace the page title with the new title from the <title> tag
             }
 
-            // call app.beforeEveryRender function if it exists
-            if (app.beforeEveryRender && typeof app.beforeEveryRender === 'function') app.beforeEveryRender(model) // e.g. document.body.style.opacity = 0
+            // determine the targets
+            let targets
+            if (thisTarget) {
+              if (Array.isArray(thisTarget)) targets = thisAppendTargets ? app.defaultTargets.concat(thisTarget) : thisTarget
+              else targets = thisAppendTargets ? app.defaultTargets.concat([thisTarget]) : [thisTarget]
+            } else targets = app.defaultTargets
 
-            // call res.beforeRender function if it exists
-            if (thisBeforeRender && typeof thisBeforeRender === 'function') thisBeforeRender(model) // e.g. document.body.style.opacity = 0
+            // call beforeRender methods if they exist
+            const beforeAfterRenderArg = {
+              model,
+              markup,
+              doc,
+              targets
+            }
+            if (app.beforeEveryRender && typeof app.beforeEveryRender === 'function') app.beforeEveryRender(beforeAfterRenderArg) // call app.beforeEveryRender function if it exists
+            if (thisBeforeRender && typeof thisBeforeRender === 'function') thisBeforeRender(beforeAfterRenderArg) // call res.beforeRender function if it exists
 
             // remove tags from the head tag if any res.remove* properties are set
             if (thisRemoveMetaTags) for (const tag of document.querySelectorAll('head meta')) tag.remove() // res.removeMetaTags
@@ -566,7 +604,7 @@ function singlePageExpress (options) {
             // wait until script tags finish loading before updating the DOM to prevent a FOUC https://en.wikipedia.org/wiki/Flash_of_unstyled_content
             for (const tag of diffElements) {
               // if the script tag is for a new script, don't update the DOM until it finishes loading
-              if (tag.nodeName === 'SCRIPT' && !document.querySelector(`script[src="${tag.src}"]`)) {
+              if (tag.nodeName === 'SCRIPT' && !document.querySelector(`script[src="${tag.src}"]`) && !document.querySelector(`script[src="${tag.src.replace(window.location.origin, '')}"]`)) {
                 const script = document.createElement('script')
                 script.src = tag.src
                 script.type = 'text/javascript'
@@ -579,34 +617,39 @@ function singlePageExpress (options) {
             // update DOM after all link tags and script tags have finished loading
             Promise.all(loadPromises).then(() => {
               window.setTimeout(() => {
-                const target = thisTarget || app.defaultTarget // check if a target is set
-                let targetEl
-                if (target) {
-                  if (document.querySelector(target)) { // check if the target is a valid DOM element
-                    targetEl = document.querySelector(target)
-                    if (doc.querySelector(target)) { // if the new template has an element with the same id as the target container, then that's the container we're writing to
-                      targetEl.innerHTML = doc.querySelector(target).innerHTML // replace the target with the contents of the template's target id
-                    } else if (doc.body) {
-                      targetEl.innerHTML = doc.body.innerHTML // replace the target with the contents of body from the template
+                const domUpdate = () => {
+                  for (const target of targets) {
+                    let targetEl
+                    if (target) {
+                      if (document.querySelector(target)) { // check if the target is a valid DOM element
+                        targetEl = document.querySelector(target)
+                        if (doc.querySelector(target)) { // if the new template has an element with the same id as the target container, then that's the container we're writing to
+                          targetEl.outerHTML = doc.querySelector(target).outerHTML // replace the target with the contents of the template's target id
+                        } else if (doc.body) {
+                          targetEl.outerHTML = doc.body.innerHTML // replace the target with the contents of body from the template
+                        } else {
+                          targetEl.outerHTML = doc.innerHTML // replace the target with the contents of the entire template
+                        }
+                      } else {
+                        const msg = `single-page-express: invalid target supplied: ${target}`
+                        console.error(msg)
+                        err = msg
+                      }
+                    } else if (doc.body && document.body) {
+                      targetEl = document.body
+                      targetEl.outerHTML = doc.body.innerHTML
                     } else {
-                      targetEl.innerHTML = doc.innerHTML // replace the target with the contents of the entire template
+                      const msg = `single-page-express: attempted to render ${template} but there was nothing to render`
+                      console.warn(msg)
+                      err = msg
                     }
-                  } else {
-                    const msg = `single-page-express: invalid target supplied: ${target}`
-                    console.error(msg)
-                    err = msg
                   }
-                } else if (doc.body && document.body) {
-                  targetEl = document.body
-                  targetEl.innerHTML = doc.body.innerHTML
-                } else {
-                  const msg = `single-page-express: attempted to render ${template} but there was nothing to render`
-                  console.warn(msg)
-                  err = msg
                 }
+                if (document.startViewTransition) currentViewTransition = document.startViewTransition(domUpdate)
+                else domUpdate()
 
                 // announce the page change to screen readers
-                const announcementContentElement = document.querySelector('h1[aria-label]') || document.querySelector('h1') || document.querySelector('title')
+                const announcementContentElement = document.querySelector('[data-page-title]') || document.querySelector('h1[aria-label]') || document.querySelector('h1') || document.querySelector('title')
                 if (!document.getElementById('singlePageExpressDefaultRenderMethodAriaLiveRegion')) {
                   const liveRegion = document.createElement('p')
                   liveRegion.id = 'singlePageExpressDefaultRenderMethodAriaLiveRegion'
@@ -629,22 +672,25 @@ function singlePageExpress (options) {
                 document.getElementById('singlePageExpressDefaultRenderMethodAriaLiveRegion').textContent = announcementContentElement.textContent
 
                 // set browser focus
+                const validElementsForOutline = ['A', 'INPUT', 'TEXTAREA', 'SELECT', 'BUTTON', 'FIELDSET'] // list of outlines that are okay to have a visible outline (mostly a problem in just safari; other browsers' default styles don't apply outlines to literally everything that is `focus()`ed)
                 let focusEl = document.querySelector(thisFocus) || document.body.querySelector('[autofocus]') // see if there's a declared focus element
                 if (focusEl && !focusEl.closest('[inert], [aria-disabled], [aria-hidden="true"]')) focusEl = null // don't focus elements that have been declared inert
-                if (focusEl && focusEl !== document.activeElement) focusEl.focus() // only focus if not already focused
-                else { // focus the target element instead
+                if (focusEl && focusEl !== document.activeElement) {
+                  focusEl.focus() // only focus if not already focused
+                  if (!validElementsForOutline.includes(focusEl.tagName)) focusEl.style.outline = 'none'
+                } else { // focus the target element instead (defined as the first element that appears in the targets array)
                   // apply a tabindex attribute to allow focusing non-focusable elements
+                  const targetEl = document.querySelector(targets[0])
                   const originalTabindex = targetEl.getAttribute('tabindex')
                   targetEl.setAttribute('tabindex', '-1')
                   targetEl.focus({ preventScroll: true })
+                  if (!validElementsForOutline.includes(targetEl.tagName)) targetEl.style.outline = 'none'
                   if (originalTabindex !== null) targetEl.setAttribute('tabindex', originalTabindex)
                 }
 
-                // call app.afterEveryRender function if it exists
-                if (app.afterEveryRender && typeof app.afterEveryRender === 'function') app.afterEveryRender(model) // e.g. document.body.style.opacity = 1
-
-                // call res.afterRender function if it exists
-                if (thisAfterRender && typeof thisAfterRender === 'function') thisAfterRender(model) // e.g. document.body.style.opacity = 1
+                // call afterRender methods if they exist
+                if (app.afterEveryRender && typeof app.afterEveryRender === 'function') app.afterEveryRender(beforeAfterRenderArg) // call app.afterEveryRender function if it exists
+                if (thisAfterRender && typeof thisAfterRender === 'function') thisAfterRender(beforeAfterRenderArg) // call res.afterRender function if it exists
               }, parseInt(thisUpdateDelay) || parseInt(app.updateDelay) || 0)
             })
           }
@@ -691,9 +737,27 @@ function singlePageExpress (options) {
   document.singlePageExpressEventListenerAdded = true // prevent attaching the event to the DOM twice
 
   // listen for back/forward button properly
-  window.addEventListener('popstate', (event) => {
-    handleRoute({ route: window.location.pathname, method: 'get', skipHistory: true }) // skipHistory prevents adding a new entry to history when responding to a back/forward button request
-  })
+  const historyStack = []
+  let currentIndex = -1
+  if (!window.singlePageExpressGlobalsInitialized) {
+    window.singlePageExpressGlobalsInitialized = true // this check prevents the event listener from being loaded multiple times if this constructor gets executed more than once
+    window.addEventListener('popstate', (event) => {
+      const state = event.state
+      let backButtonPressed = false
+      let forwardButtonPressed = false
+      const newIndex = state.index
+      if (newIndex < currentIndex) backButtonPressed = true
+      else if (newIndex > currentIndex) forwardButtonPressed = true
+      currentIndex = newIndex
+      handleRoute({
+        route: window.location.pathname,
+        method: 'get',
+        skipHistory: true, // skipHistory prevents adding a new entry to history when responding to a back/forward button request
+        backButtonPressed,
+        forwardButtonPressed
+      })
+    })
+  }
 
   // #endregion
 

@@ -4,6 +4,24 @@
 
 - Put your changes here...
 
+## 1.2.0
+
+- Added view transition support in the default render method.
+- Added support for multiple DOM update targets in the default render method.
+- Added `req.backButtonPressed` and `req.forwardButtonPressed` to `app`.
+- Added classes `backButtonPressed` and `forwardButtonPressed` which will populate on the `<html>` element if either button was pressed.
+- Added `[data-page-title]` to the top of the list of accepted query selectors for sourcing content to announce to screen readers when a new page is rendered.
+- Added new params to the `res.beforeRender(params)`, `beforeEveryRender(params)`, `res.afterRender(params)`, and `afterEveryRender(params)` methods:
+  - It now supplies an object with:
+    - `model`: The data model supplied to the template to be rendered.
+    - `doc`: The document object created from the template after it is rendered.
+    - `markup`: The HTML string that will be written to the page.
+    - `targets`: The list of DOM nodes that will be updated.
+- Fixed a bug that caused `postRenderCallbacks` not to function properly.
+- Fixed a bug related to script tags from the rendered page being executed unnecessarily.
+- Fixed a bug causing unnecessary outlines to appear on page transitions in Safari.
+- Updated dependencies.
+
 ## 1.1.1
 
 - Fixed crash related to unfinished HTML validation feature.

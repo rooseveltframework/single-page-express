@@ -11,6 +11,7 @@ app.set('views', 'mvc/views') // set template dir
 app.set('view engine', 'html') // set teddy as default view engine
 if (!fs.existsSync('public')) fs.mkdirSync('public') // make the public folder if it does not exist
 app.use(express.static('public')) // make public folder serve static files
+fs.copyFileSync('styles.css', 'public/styles.css')
 
 // load shared express routes; this same file will be loaded in the frontend js bundle
 require('./mvc/routes')(app)

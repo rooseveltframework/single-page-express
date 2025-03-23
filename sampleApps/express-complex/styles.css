@@ -1,0 +1,119 @@
+/* global styles */
+
+@view-transition { /* enable multi-page view transitions */
+  navigation: auto;
+}
+
+nav {
+  background-color: #ccc;
+  border: 1px #666 solid;
+  z-index: 2;
+  width: 100%;
+}
+
+nav ul {
+  padding: 0 15px;
+}
+
+nav li {
+  display: inline-block;
+}
+
+nav li:after {
+  content: " | ";
+}
+
+nav li:last-of-type::after {
+  content: "";
+}
+
+p {
+  z-index: 1;
+}
+
+/* css animations */
+
+@keyframes fade-in {
+  from { opacity: 0; }
+}
+
+@keyframes fade-out {
+  to { opacity: 0; }
+}
+
+@keyframes slide-from-right {
+  from { transform: translateX(30px); }
+}
+
+@keyframes slide-to-left {
+  to { transform: translateX(-30px); }
+}
+
+@keyframes slide-from-left {
+  from { transform: translateX(-30px); }
+}
+
+@keyframes slide-to-right {
+  to { transform: translateX(30px); }
+}
+
+/* declare some css variables to define css animation properties */
+:root {
+  --fade-out: 90ms cubic-bezier(0.4, 0, 1, 1) both fade-out;
+  --fade-in: 210ms cubic-bezier(0, 0, 0.2, 1) 90ms both fade-in;
+  --slide-to-left: 300ms cubic-bezier(0.4, 0, 0.2, 1) both slide-to-left;
+  --slide-from-right: 300ms cubic-bezier(0.4, 0, 0.2, 1) both slide-from-right;
+  --slide-to-right: 300ms cubic-bezier(0.4, 0, 0.2, 1) both slide-to-right;
+  --slide-from-left: 300ms cubic-bezier(0.4, 0, 0.2, 1) both slide-from-left;
+}
+
+/* view transitions that leverage these animations */
+
+body > header > h2 {
+  view-transition-name: page-title-slide;
+}
+
+body > article {
+  view-transition-name: page-content-slide;
+}
+
+html.fade body > header > h2 {
+  view-transition-name: page-title-fade;
+}
+
+html.fade body > article {
+  view-transition-name: page-content-fade;
+}
+
+/* fade */
+::view-transition-old(page-title-fade),
+::view-transition-old(page-content-fade) {
+  animation: var(--fade-out);
+}
+
+::view-transition-new(page-title-fade),
+::view-transition-new(page-content-fade) {
+  animation: var(--fade-in);
+}
+
+/* slide left */
+::view-transition-old(page-title-slide),
+::view-transition-old(page-content-slide) {
+  animation: var(--fade-out), var(--slide-to-left);
+}
+
+::view-transition-new(page-title-slide),
+::view-transition-new(page-content-slide) {
+  animation: var(--fade-in), var(--slide-from-right);
+}
+
+/* slide right when the back button is pressed */
+.backButtonPressed::view-transition-old(page-title-slide),
+.backButtonPressed::view-transition-old(page-content-slide) {
+  animation: var(--fade-out), var(--slide-to-right);
+}
+
+.backButtonPressed::view-transition-new(page-title-slide),
+.backButtonPressed::view-transition-new(page-content-slide) {
+  animation: var(--fade-in), var(--slide-from-left);
+}
