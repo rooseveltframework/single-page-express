@@ -8,7 +8,7 @@
       "url": "https://github.com/rooseveltframework/single-page-express/graphs/contributors"
     }
   ],
-  "version": "1.2.0",
+  "version": "2.0.0",
   "files": [
     "dist"
   ],
@@ -31,7 +31,7 @@
   },
   "devDependencies": {
     "@playwright/test": "1.51.1",
-    "express": "4.21.2",
+    "express": "5.1.0",
     "standard": "17.1.2",
     "teddy": "1.0.1",
     "webpack-cli": "6.0.1"

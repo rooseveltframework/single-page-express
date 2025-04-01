@@ -1,5 +1,5 @@
 const app = window.singlePageExpress({
-  expressVersion: 4,
+  expressVersion: 5,
   disableTopbar: true,
   templatingEngine: window.teddy,
   templates: { // in a real app, you'd populate the templates object with some kind of module bundler or something
@@ -10,8 +10,8 @@ const app = window.singlePageExpress({
           <meta name="viewport" content="width=device-width,initial-scale=1">
           <meta name="format-detection" content="telephone=no">
           <title>Sample app for single-page-express</title>
-          <script src="../../node_modules/teddy/dist/teddy.js" defer></script>
-          <script src="../../dist/single-page-express.js" defer></script>
+          <script src="teddy.js" defer></script>
+          <script src="single-page-express.js" defer></script>
           <script src="index.js" defer></script>
         </head>
       <body>

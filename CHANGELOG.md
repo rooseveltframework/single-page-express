@@ -4,6 +4,19 @@
 
 - Put your changes here...
 
+## 2.0.0
+
+- Breaking: Changed default Express API version to 5.
+  - To migrate:
+    - Most apps probably only need to change `*` routes to `*all`.
+    - Apps that use more complex routing may need other changes.
+    - Full list of considerations for migrating to Express 5: https://expressjs.com/en/guide/migrating-5.html
+- Fixed a bug that caused `req.body` to populate `{}` instead of `undefined` in Express 5 mode.
+- Fixed a bug that caused the default `/` route to not load in some situations.
+- Fixed a bug that caused extra `<head>` tags to get inserted into the DOM with the default render method in some situations.
+- Fixed issues in sample app 2.
+- Updated dependencies.
+
 ## 1.2.0
 
 - Added view transition support in the default render method.

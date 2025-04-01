@@ -7,7 +7,7 @@ function singlePageExpress (options) {
   const app = {} // instance of the router app
   app.expressVersion = options.expressVersion // which version of the express api to target
   if (app.expressVersion !== 5 && (parseInt(app.expressVersion) <= 4)) app.expressVersion = 4 // permit express 4 and 5+
-  if (!app.expressVersion) app.expressVersion = 4 // default to express 4
+  if (!app.expressVersion) app.expressVersion = 5 // default to express 5
   app.appVars = {} // for app.set() / app.get()
   app.templatingEngine = options.templatingEngine // which templating engine to use
   app.templates = options.templates // templates to render
@@ -16,6 +16,7 @@ function singlePageExpress (options) {
   app.routeCallbacks = {} // list of functions to execute when the route is invoked
   app.defaultTarget = options.defaultTarget // which element to replace by default
   app.defaultTargets = app.defaultTarget ? [app.defaultTarget].concat(options.defaultTargets || []) : options.defaultTargets || [] // which elements to replace by default
+  if (!app.defaultTargets.length) app.defaultTargets = ['body'] // body tag is the default target if none is set
   app.beforeEveryRender = options.beforeEveryRender // function to execute before every DOM update if using the default render method
   app.updateDelay = options.updateDelay // how long to delay after executing app.beforeEveryRender or this.beforeRender before performing the DOM update
   app.afterEveryRender = options.afterEveryRender // function to execute after every DOM update if using the default render method
@@ -310,7 +311,7 @@ function singlePageExpress (options) {
     if (app.appVars['case sensitive routing']) routeWithoutQuery = routeWithoutQuery.toLowerCase()
 
     // remove trailing `/` if it exists and if strict routing is disabled
-    if (!app.appVars['strict routing'] && routeWithoutQuery.endsWith('/')) routeWithoutQuery = routeWithoutQuery.slice(0, -1)
+    if (!app.appVars['strict routing'] && routeWithoutQuery.length > 1 && routeWithoutQuery.endsWith('/')) routeWithoutQuery = routeWithoutQuery.slice(0, -1)
 
     // loop through route matcher functions to see if any of them match this url pattern
     for (const registeredRoute in app.routes) {
@@ -366,6 +367,7 @@ function singlePageExpress (options) {
           if (params.event.submitter) req.body[params.event.submitter.name] = params.event.submitter.value // add which button was clicked to req.body
         } else if (params.body) req.body = params.body // use manually submitted request body if it is provided instead
         else req.body = {} // otherwise set req.body to an empty object
+        if (app.expressVersion > 4 && req.body && Object.keys(req.body).length === 0) req.body = undefined // if req.body is an empty object and the express version is 5+ then set req.body to undefined to match the express api
       }
 
       // req.cookies
@@ -620,27 +622,19 @@ function singlePageExpress (options) {
                 const domUpdate = () => {
                   for (const target of targets) {
                     let targetEl
-                    if (target) {
-                      if (document.querySelector(target)) { // check if the target is a valid DOM element
-                        targetEl = document.querySelector(target)
-                        if (doc.querySelector(target)) { // if the new template has an element with the same id as the target container, then that's the container we're writing to
-                          targetEl.outerHTML = doc.querySelector(target).outerHTML // replace the target with the contents of the template's target id
-                        } else if (doc.body) {
-                          targetEl.outerHTML = doc.body.innerHTML // replace the target with the contents of body from the template
-                        } else {
-                          targetEl.outerHTML = doc.innerHTML // replace the target with the contents of the entire template
-                        }
+                    if (document.querySelector(target)) { // check if the target is a valid DOM element
+                      targetEl = document.querySelector(target)
+                      const propertyToUpdate = targetEl.nodeName === 'BODY' ? 'innerHTML' : 'outerHTML' // if targetEl is a body tag, update innerHTML, otherwise outerHTML; this prevents duplicate head tags from being inserted into the DOM
+                      if (doc.querySelector(target)) { // if the new template has an element with the same id as the target container, then that's the container we're writing to
+                        targetEl[propertyToUpdate] = doc.querySelector(target).outerHTML // replace the target with the contents of the template's target id
+                      } else if (doc.body) {
+                        targetEl[propertyToUpdate] = doc.body.innerHTML // replace the target with the contents of body from the template
                       } else {
-                        const msg = `single-page-express: invalid target supplied: ${target}`
-                        console.error(msg)
-                        err = msg
+                        targetEl[propertyToUpdate] = doc.innerHTML // replace the target with the contents of the entire template
                       }
-                    } else if (doc.body && document.body) {
-                      targetEl = document.body
-                      targetEl.outerHTML = doc.body.innerHTML
                     } else {
-                      const msg = `single-page-express: attempted to render ${template} but there was nothing to render`
-                      console.warn(msg)
+                      const msg = `single-page-express: invalid target supplied: ${target}`
+                      console.error(msg)
                       err = msg
                     }
                   }
