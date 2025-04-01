@@ -1,5 +1,5 @@
 const app = window.singlePageExpress({
-  expressVersion: 4
+  expressVersion: 5
 })
 
 // define routes
