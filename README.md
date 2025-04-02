@@ -218,7 +218,7 @@ If this DOM manipulation behavior is undesirable to you, you can supply your own
 
 #### Basic configuration
 
-- `expressVersion`: Optionally set which version of the Express API to use for route string parsing. Supports values `4` or `5`. Express 3 and below are not supported. Defaults to `4`.
+- `expressVersion`: Optionally set which version of the Express API to use for route string parsing. Supports values `4` or `5`. Express 3 and below are not supported. Defaults to `5`.
 - `templatingEngine`: Which Express templating system to use. You must include the package in your app and supply the module as an argument to this param. This param is required if you use the default render method and do not supply your own.
 - `templates`: Supply an object with keys that are template names and values that are template strings. This param is required if you use the default render method and do not supply your own.
 - `renderMethod(template, model callback)`: Optionally supply a function to execute when `res.render` is called in your routes. If you do not provide one, a default one will be used that will render your template with your chosen templating engine and make appropriate updates to the DOM. See below for details about what the default render method does specifically and how to customize its behavior.
