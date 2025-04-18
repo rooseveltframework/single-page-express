@@ -30,7 +30,7 @@
     "topbar": "3.0.0"
   },
   "devDependencies": {
-    "@playwright/test": "1.51.1",
+    "@playwright/test": "1.52.0",
     "express": "5.1.0",
     "standard": "17.1.2",
     "teddy": "1.0.1",
