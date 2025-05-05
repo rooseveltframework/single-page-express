@@ -1,3 +1,8 @@
+## 2.0.2
+
+- Fixed regression that caused middleware support to break routes without middleware.
+- Updated dependencies.
+
 ## 2.0.1
 
 - Added support for middleware on routes.
