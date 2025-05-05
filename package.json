@@ -1,6 +1,6 @@
 {
   "name": "single-page-express",
-  "description": "📄 A client-side implementation of the Express route API. ",
+  "description": "📄 A client-side implementation of the Express route API.",
   "author": "Roosevelt Framework Team <rooseveltframework@gmail.com>",
   "contributors": [
     {
@@ -8,7 +8,7 @@
       "url": "https://github.com/rooseveltframework/single-page-express/graphs/contributors"
     }
   ],
-  "version": "2.0.0",
+  "version": "2.0.1",
   "files": [
     "dist",
     "*.md"
@@ -22,7 +22,7 @@
       "default": "./dist/single-page-express.min.mjs"
     }
   },
-  "homepage": "https://github.com/rooseveltframework/single-page-express",
+  "homepage": "https://rooseveltframework.org/docs/single-page-express/latest",
   "license": "CC-BY-4.0",
   "main": "single-page-express.js",
   "dependencies": {
@@ -31,10 +31,10 @@
     "topbar": "3.0.0"
   },
   "devDependencies": {
-    "@playwright/test": "1.51.1",
+    "@playwright/test": "1.52.0",
     "express": "5.1.0",
     "standard": "17.1.2",
-    "teddy": "1.0.1",
+    "teddy": "1.1.4",
     "webpack-cli": "6.0.1"
   },
   "scripts": {
