@@ -85,12 +85,8 @@ function singlePageExpress (options) {
 
   // registers a route and handles middleware
   function routeHandler (method, middleware, route, callback) {
-    let callbackWithMiddlewareExecutingFirst = callback // by default no middleware executes
-    if (!callback) {
-      // handle 2 args; this is when no middleware is supplied
-      callback = route
-      route = middleware
-    } else callbackWithMiddlewareExecutingFirst = (req, res) => middleware(req, res, () => callback(req, res)) // handle 3 args; this is when middleware is supplied
+    let callbackWithMiddlewareExecutingFirst = middleware
+    if (callback) callbackWithMiddlewareExecutingFirst = (req, res) => middleware(req, res, () => callback(req, res))
     registerRoute(method, route, callbackWithMiddlewareExecutingFirst)
   }
 
