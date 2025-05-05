@@ -1,3 +1,8 @@
+## 2.0.1
+
+- Added support for middleware on routes.
+- Updated dependencies.
+
 ## 2.0.0
 
 - Breaking: Changed default Express API version to 5.

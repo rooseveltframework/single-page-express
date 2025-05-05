@@ -83,31 +83,42 @@ function singlePageExpress (options) {
   // express app object events
   app.mount = () => {} // stubbed out
 
+  // registers a route and handles middleware
+  function routeHandler (method, middleware, route, callback) {
+    let callbackWithMiddlewareExecutingFirst = callback // by default no middleware executes
+    if (!callback) {
+      // handle 2 args; this is when no middleware is supplied
+      callback = route
+      route = middleware
+    } else callbackWithMiddlewareExecutingFirst = (req, res) => middleware(req, res, () => callback(req, res)) // handle 3 args; this is when middleware is supplied
+    registerRoute(method, route, callbackWithMiddlewareExecutingFirst)
+  }
+
   // express app object methods
-  app.all = (route, callback) => { registerRoute('all', route, callback) }
-  app.delete = (route, callback) => { registerRoute('delete', route, callback) }
+  app.all = (middleware, route, callback) => { routeHandler('all', middleware, route, callback) }
+  app.delete = (middleware, route, callback) => { routeHandler('delete', middleware, route, callback) }
   app.disable = (name) => { app.appVars[name] = false }
   app.disabled = (name) => { return !app.appVars[name] }
   app.enable = (name) => { app.appVars[name] = true }
   app.enabled = (name) => { return !!app.appVars[name] }
   app.engine = () => {} // stubbed out
-  app.get = (name, callback) => { // in the express docs, this method is overloaded and can be used for more than one thing based on the number of arguments
+  app.get = (middleware, name, callback) => { // in the express docs, this method is overloaded and can be used for more than one thing based on the number of arguments
     if (!callback) return app.appVars[name]
-    else return registerRoute('get', name, callback)
+    else return routeHandler('get', middleware, name, callback)
   }
   app.listen = () => {} // stubbed out
   httpVerbs.forEach(method => { // app.METHOD
     // some method names are overloaded and can be used for more than one thing based on the number of arguments
-    if (!app[method]) app[method] = (route, callback) => { registerRoute(method, route, callback) }
+    if (!app[method]) app[method] = (middleware, route, callback) => routeHandler(method, middleware, route, callback)
   })
   app.param = () => {} // stubbed out
   app.path = () => {} // stubbed out
-  app.post = (route, callback) => { registerRoute('post', route, callback) }
-  app.put = (route, callback) => { registerRoute('put', route, callback) }
+  app.post = (middleware, route, callback) => { routeHandler('post', middleware, route, callback) }
+  app.put = (middleware, route, callback) => { routeHandler('put', middleware, route, callback) }
   // app.render will be defined below
   app.route = (route) => {
     const ret = { route }
-    httpVerbs.forEach(method => { ret[method] = (callback) => { registerRoute(method, route, callback) } })
+    httpVerbs.forEach(method => { ret[method] = (middleware, callback) => { routeHandler(method, middleware, route, callback) } })
     return ret
   }
   app.set = (name, val) => { app.appVars[name] = val }
@@ -258,7 +269,7 @@ function singlePageExpress (options) {
   function registerRoute (method, route, callback) {
     // if the method is 'all' then we need to call this function for every method
     if (method === 'all') {
-      httpVerbs.forEach(method => { registerRoute(method, route, callback) })
+      httpVerbs.forEach((middleware, method) => { routeHandler(method, middleware, route, callback) })
       return
     }
 
