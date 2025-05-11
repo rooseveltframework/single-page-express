@@ -1,3 +1,8 @@
+## 2.0.3
+
+- Fixed regression that caused after-render actions to break in Chrome in the default render method.
+- Updated dependencies.
+
 ## 2.0.2
 
 - Fixed regression that caused middleware support to break routes without middleware.
