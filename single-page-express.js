@@ -312,7 +312,7 @@ function singlePageExpress (options) {
 
     // check if it's a registered route
     let match
-    let routeWithoutQuery = route.split('?')[0]
+    let routeWithoutQuery = route.split('?')[0] // TODO: handle links without href attributes
 
     // flatten if case insensitivity is enabled
     if (app.appVars['case sensitive routing']) routeWithoutQuery = routeWithoutQuery.toLowerCase()
@@ -639,6 +639,50 @@ function singlePageExpress (options) {
                       } else {
                         targetEl[propertyToUpdate] = doc.innerHTML // replace the target with the contents of the entire template
                       }
+
+                      // announce the page change to screen readers
+                      const announcementContentElement = document.querySelector('[data-page-title]') || document.querySelector('h1[aria-label]') || document.querySelector('h1') || document.querySelector('title')
+                      if (!document.getElementById('singlePageExpressDefaultRenderMethodAriaLiveRegion')) {
+                        const liveRegion = document.createElement('p')
+                        liveRegion.id = 'singlePageExpressDefaultRenderMethodAriaLiveRegion'
+                        liveRegion.setAttribute('aria-live', 'assertive')
+                        liveRegion.setAttribute('aria-atomic', 'true')
+                        liveRegion.style.position = 'absolute'
+                        liveRegion.style.top = '-9999px'
+                        liveRegion.style.left = '-9999px'
+                        liveRegion.style.width = '1px'
+                        liveRegion.style.height = '1px'
+                        liveRegion.style.overflow = 'hidden'
+                        liveRegion.style.border = '0'
+                        liveRegion.style.margin = '-1px'
+                        liveRegion.style.padding = '0'
+                        liveRegion.style.clipPath = 'inset(50%)'
+                        liveRegion.style.whiteSpace = 'nowrap'
+                        document.body.appendChild(liveRegion)
+                      }
+                      document.getElementById('singlePageExpressDefaultRenderMethodAriaLiveRegion').textContent = '' // clear before announcing
+                      document.getElementById('singlePageExpressDefaultRenderMethodAriaLiveRegion').textContent = announcementContentElement.textContent
+
+                      // set browser focus
+                      const validElementsForOutline = ['A', 'INPUT', 'TEXTAREA', 'SELECT', 'BUTTON', 'FIELDSET'] // list of outlines that are okay to have a visible outline (mostly a problem in just safari; other browsers' default styles don't apply outlines to literally everything that is `focus()`ed)
+                      let focusEl = document.querySelector(thisFocus) || document.body.querySelector('[autofocus]') // see if there's a declared focus element
+                      if (focusEl && !focusEl.closest('[inert], [aria-disabled], [aria-hidden="true"]')) focusEl = null // don't focus elements that have been declared inert
+                      if (focusEl && focusEl !== document.activeElement) {
+                        focusEl.focus() // only focus if not already focused
+                        if (!validElementsForOutline.includes(focusEl.tagName)) focusEl.style.outline = 'none'
+                      } else { // focus the target element instead (defined as the first element that appears in the targets array)
+                        // apply a tabindex attribute to allow focusing non-focusable elements
+                        const targetEl = document.querySelector(targets[0])
+                        const originalTabindex = targetEl.getAttribute('tabindex')
+                        targetEl.setAttribute('tabindex', '-1')
+                        targetEl.focus({ preventScroll: true })
+                        if (!validElementsForOutline.includes(targetEl.tagName)) targetEl.style.outline = 'none'
+                        if (originalTabindex !== null) targetEl.setAttribute('tabindex', originalTabindex)
+                      }
+
+                      // call afterRender methods if they exist
+                      if (app.afterEveryRender && typeof app.afterEveryRender === 'function') app.afterEveryRender(beforeAfterRenderArg) // call app.afterEveryRender function if it exists
+                      if (thisAfterRender && typeof thisAfterRender === 'function') thisAfterRender(beforeAfterRenderArg) // call res.afterRender function if it exists
                     } else {
                       const msg = `single-page-express: invalid target supplied: ${target}`
                       console.error(msg)
@@ -648,50 +692,6 @@ function singlePageExpress (options) {
                 }
                 if (document.startViewTransition) currentViewTransition = document.startViewTransition(domUpdate)
                 else domUpdate()
-
-                // announce the page change to screen readers
-                const announcementContentElement = document.querySelector('[data-page-title]') || document.querySelector('h1[aria-label]') || document.querySelector('h1') || document.querySelector('title')
-                if (!document.getElementById('singlePageExpressDefaultRenderMethodAriaLiveRegion')) {
-                  const liveRegion = document.createElement('p')
-                  liveRegion.id = 'singlePageExpressDefaultRenderMethodAriaLiveRegion'
-                  liveRegion.setAttribute('aria-live', 'assertive')
-                  liveRegion.setAttribute('aria-atomic', 'true')
-                  liveRegion.style.position = 'absolute'
-                  liveRegion.style.top = '-9999px'
-                  liveRegion.style.left = '-9999px'
-                  liveRegion.style.width = '1px'
-                  liveRegion.style.height = '1px'
-                  liveRegion.style.overflow = 'hidden'
-                  liveRegion.style.border = '0'
-                  liveRegion.style.margin = '-1px'
-                  liveRegion.style.padding = '0'
-                  liveRegion.style.clipPath = 'inset(50%)'
-                  liveRegion.style.whiteSpace = 'nowrap'
-                  document.body.appendChild(liveRegion)
-                }
-                document.getElementById('singlePageExpressDefaultRenderMethodAriaLiveRegion').textContent = '' // clear before announcing
-                document.getElementById('singlePageExpressDefaultRenderMethodAriaLiveRegion').textContent = announcementContentElement.textContent
-
-                // set browser focus
-                const validElementsForOutline = ['A', 'INPUT', 'TEXTAREA', 'SELECT', 'BUTTON', 'FIELDSET'] // list of outlines that are okay to have a visible outline (mostly a problem in just safari; other browsers' default styles don't apply outlines to literally everything that is `focus()`ed)
-                let focusEl = document.querySelector(thisFocus) || document.body.querySelector('[autofocus]') // see if there's a declared focus element
-                if (focusEl && !focusEl.closest('[inert], [aria-disabled], [aria-hidden="true"]')) focusEl = null // don't focus elements that have been declared inert
-                if (focusEl && focusEl !== document.activeElement) {
-                  focusEl.focus() // only focus if not already focused
-                  if (!validElementsForOutline.includes(focusEl.tagName)) focusEl.style.outline = 'none'
-                } else { // focus the target element instead (defined as the first element that appears in the targets array)
-                  // apply a tabindex attribute to allow focusing non-focusable elements
-                  const targetEl = document.querySelector(targets[0])
-                  const originalTabindex = targetEl.getAttribute('tabindex')
-                  targetEl.setAttribute('tabindex', '-1')
-                  targetEl.focus({ preventScroll: true })
-                  if (!validElementsForOutline.includes(targetEl.tagName)) targetEl.style.outline = 'none'
-                  if (originalTabindex !== null) targetEl.setAttribute('tabindex', originalTabindex)
-                }
-
-                // call afterRender methods if they exist
-                if (app.afterEveryRender && typeof app.afterEveryRender === 'function') app.afterEveryRender(beforeAfterRenderArg) // call app.afterEveryRender function if it exists
-                if (thisAfterRender && typeof thisAfterRender === 'function') thisAfterRender(beforeAfterRenderArg) // call res.afterRender function if it exists
               }, parseInt(thisUpdateDelay) || parseInt(app.updateDelay) || 0)
             })
           }
