@@ -1,3 +1,11 @@
+## 2.0.4
+
+- Fixed a bug that caused a race condition related to view transitions and afterRender methods and render callbacks.
+- Fixed a bug that caused Single Page Express to trigger on `<a>` elements that do not have `href` attributes.
+- Fixed a bug that caused Single Page Express to trigger on `<form>` elements that do not have `action` attributes.
+- Fixed a bug that caused history state to be modified in ways that could cause crashes.
+- Updated dependencies.
+
 ## 2.0.3
 
 - Fixed regression that caused after-render actions to break in Chrome in the default render method.

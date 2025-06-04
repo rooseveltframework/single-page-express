@@ -4,8 +4,8 @@
   "dependencies": {
     "express": "5.1.0",
     "module-alias": "2.2.3",
-    "teddy": "1.0.1",
-    "webpack": "5.98.0"
+    "teddy": "1.1.4",
+    "webpack": "5.99.9"
   },
   "_moduleAliases": {
     "models": "mvc/models/server"

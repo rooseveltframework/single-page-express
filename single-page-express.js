@@ -506,9 +506,28 @@ function singlePageExpress (options) {
     this.updateDelay = null
     this.afterRender = null
 
+    const postRenderCallbacks = () => {
+      // fire post-render callback for this template if it exists
+      if (app.postRenderCallbacks[template]) {
+        if (typeof app.postRenderCallbacks[template] === 'function') {
+          app.postRenderCallbacks[template](model)
+        } else console.error(`single-page-express: post-render callback for ${template} is not a function.`)
+      }
+
+      // fire a post-render callback registered for all templates if it exists
+      for (const key in app.postRenderCallbacks) {
+        if (key.startsWith('*')) { // this allows both * and *all syntax for both express 4 and 5 compatibility
+          if (typeof app.postRenderCallbacks[key] === 'function') app.postRenderCallbacks[key](model)
+          else console.error(`single-page-express: post-render callback for ${key} is not a function.`)
+          break
+        }
+      }
+    }
+
     if (options.renderMethod) {
       // execute user-supplied render method if it is provided
       options.renderMethod(template, model, callback)
+      postRenderCallbacks()
     } else {
       // execute default render method if the user does not supply one
       let err
@@ -689,6 +708,11 @@ function singlePageExpress (options) {
                       err = msg
                     }
                   }
+
+                  // call user-defined callback supplied to the render method if it exists
+                  if (callback && typeof callback === 'function') callback(err, markup)
+
+                  postRenderCallbacks()
                 }
                 if (document.startViewTransition) currentViewTransition = document.startViewTransition(domUpdate)
                 else domUpdate()
@@ -696,25 +720,6 @@ function singlePageExpress (options) {
             })
           }
         }
-      }
-
-      // call user-defined callback supplied to the render method if it exists
-      if (callback && typeof callback === 'function') callback(err, markup)
-    }
-
-    // fire post-render callback for this template if it exists
-    if (app.postRenderCallbacks[template]) {
-      if (typeof app.postRenderCallbacks[template] === 'function') {
-        app.postRenderCallbacks[template](model)
-      } else console.error(`single-page-express: post-render callback for ${template} is not a function.`)
-    }
-
-    // fire a post-render callback registered for all templates if it exists
-    for (const key in app.postRenderCallbacks) {
-      if (key.startsWith('*')) { // this allows both * and *all syntax for both express 4 and 5 compatibility
-        if (typeof app.postRenderCallbacks[key] === 'function') app.postRenderCallbacks[key](model)
-        else console.error(`single-page-express: post-render callback for ${key} is not a function.`)
-        break
       }
     }
   }
@@ -727,12 +732,12 @@ function singlePageExpress (options) {
   if (!document.singlePageExpressEventListenerAdded) {
     // listen for link navigation events
     document.addEventListener('click', (event) => {
-      if (event.target.tagName === 'A') handleRoute({ route: event.target.getAttribute('href'), event })
+      if (event.target.tagName === 'A' && event.target.href) handleRoute({ route: event.target.getAttribute('href'), event })
     })
 
     // listen for form submits
     document.addEventListener('submit', (event) => {
-      handleRoute({ route: event.target.getAttribute('action'), event, parseBody: true, method: event.target.getAttribute('method') })
+      if (event.target.getAttribute('action')) handleRoute({ route: event.target.getAttribute('action'), event, parseBody: true, method: event.target.getAttribute('method') })
     })
   }
   document.singlePageExpressEventListenerAdded = true // prevent attaching the event to the DOM twice
@@ -744,6 +749,7 @@ function singlePageExpress (options) {
     window.singlePageExpressGlobalsInitialized = true // this check prevents the event listener from being loaded multiple times if this constructor gets executed more than once
     window.addEventListener('popstate', (event) => {
       const state = event.state
+      if (!state) return
       let backButtonPressed = false
       let forwardButtonPressed = false
       const newIndex = state.index
