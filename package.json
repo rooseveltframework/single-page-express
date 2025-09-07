@@ -26,7 +26,7 @@
   "license": "CC-BY-4.0",
   "main": "single-page-express.js",
   "dependencies": {
-    "path-to-regexp": "8.2.0",
+    "path-to-regexp": "8.3.0",
     "path-to-regexp-express4": "npm:path-to-regexp@0.1.12",
     "topbar": "3.0.0"
   },
