@@ -26,12 +26,12 @@
   "license": "CC-BY-4.0",
   "main": "single-page-express.js",
   "dependencies": {
-    "path-to-regexp": "8.2.0",
+    "path-to-regexp": "8.3.0",
     "path-to-regexp-express4": "npm:path-to-regexp@0.1.12",
     "topbar": "3.0.0"
   },
   "devDependencies": {
-    "@playwright/test": "1.52.0",
+    "@playwright/test": "1.56.1",
     "express": "5.1.0",
     "standard": "17.1.2",
     "teddy": "1.1.4",
