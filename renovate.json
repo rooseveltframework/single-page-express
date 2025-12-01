@@ -6,8 +6,10 @@
     ":respectLatest",
     ":disableDependencyDashboard"
   ],
-  "packageRules": {
-    "matchPackageNames": ["path-to-regexp-express4"],
-    "allowedVersions": "~0.1.0"
-  }
+  "packageRules": [
+    {
+      "matchPackageNames": ["path-to-regexp-express4"],
+      "allowedVersions": "~0.1.0"
+    }
+  ]
 }
