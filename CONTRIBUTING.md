@@ -2,6 +2,7 @@
 
 ## Before opening a pull request
 
+- Install the dependencies: `npm ci`, then `npm ci` again in `sampleApps/express-complex`. The test suite runs against that sample app, and it has its own dependencies.
 - Be sure all tests pass: `npm t`.
 - Ensure good test coverage and write new tests if necessary: `npm run coverage`.
 - Add your changes to `CHANGELOG.md`.

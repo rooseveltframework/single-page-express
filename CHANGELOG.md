@@ -1,3 +1,32 @@
+## 2.1.0
+
+- Added support for Express middleware. `app.use()` accepts an optional path followed by any number of middleware functions, arrays of them, routers, or other apps, and error handling middleware is identified by its arity of four, as in Express. Middleware alone will never cause a link or form submit to be captured; only a matching route does that.
+- Added support for the Express Router. `singlePageExpress.Router([options])` creates a router that holds its own middleware, routes and param callbacks, and is mounted with `use()` on an app or another router.
+- Added support for mounting apps. A `single-page-express` app can be mounted on another one with `app.use()`, which sets `app.mountpath` and `app.parent`, makes `app.path()` report the full mount path, fires the `mount` event, and sets `req.baseUrl` and `req.url` for requests it handles.
+- Added support for `app.param()` and `router.param()`.
+- Added optional HTML validation of post-rendered templates via the new `htmlValidator` constructor param. Supply an [html-validate](https://html-validate.org/) instance, or anything with a `validateStringSync()` or `validateString()` method, and the markup your templates produce is checked on every render, with problems reported to the console and the full report handed to your render hooks as `params.htmlValidation`.
+- Added stubs for the native Node.js `http.IncomingMessage` and `http.ServerResponse` properties and methods that Express's request and response objects inherit, so that a route written against them does not crash when it is reused on the frontend.
+- Added support for `req.param()`, `res.locals`, `app.locals`, and the header methods `res.set()`, `res.get()`, `res.append()`, `res.header()`, `res.location()`, `res.type()`, `res.vary()` and `res.status()`, which now record what they are given so a route that sets a header or a status and reads it back gets what it set.
+- Added support for changing `case sensitive routing` and `strict routing` after routes have been registered; route patterns are now compiled on demand rather than at registration time.
+- Fixed a bug that caused the remembered scroll position of a page to be lost whenever it was returned to with the back or forward button. The browser updates `window.location` before firing `popstate`, so the scroll position being saved for the page being left was written under the key of the page being returned to, overwriting the very position that was about to be restored. Scroll positions are now saved under the route that is actually on screen.
+- Fixed a bug that caused a page's scroll position to be remembered separately per query string rather than per path.
+- Fixed a bug that caused the back button to fail to restore the page the user started on. The history entry the page loads on has no state of its own, and the popstate handler ignores entries without one, so the first press of the back button changed the URL without re-rendering.
+- Fixed a bug that caused `app.all` to register unusable routes, making routes declared with it never fire.
+- Fixed a bug that caused the `case sensitive routing` setting to be applied backwards; routes are now matched case insensitively by default and case sensitively when the setting is enabled, as in Express.
+- Fixed a bug that caused route params to be lowercased when case insensitive routing was in effect.
+- Fixed a bug that caused `req.cookies` to contain a phantom entry when no cookies were set, and to truncate cookie values containing `=`.
+- Fixed a bug that caused `req.protocol` to include a trailing colon rather than reporting the protocol the way Express does.
+- Fixed a bug that caused `res.appendTargets` to persist across renders instead of being cleared after each one.
+- Fixed a bug that caused the default render method to throw instead of logging an error when no templating engine was supplied.
+- Fixed a bug that caused the default render method to skip focusing elements it should focus and focus elements declared inert.
+- Fixed a bug that caused `app.afterEveryRender`, `res.afterRender`, and the screen reader announcement to fire once per target rather than once per render.
+- Fixed a bug that caused a crash when `res.resetScroll` was set on a page that had not been visited before.
+- Fixed a bug that caused Express 4 route params to be extracted with a fragile pattern instead of the route parser's own key names.
+- Fixed the Teddy example in the usage docs, which never registered its templates with Teddy and so rendered template names instead of templates.
+- Fixed the Express 5 wildcard route example in the usage docs, which used a route pattern the route parser rejects.
+- Fixed the documented type and description of `res.appendTargets`, which is a boolean flag rather than a list of selectors, and corrected its name where the docs called it `res.addTargets`.
+- Updated dependencies.
+
 ## 2.0.5
 
 - Added `app.alwaysSkipViewTransition` and `res.skipViewTransition` options. When set to true, if using the default render method, the DOM update will not be wrapped in a `document.startViewTransition()` call, which is useful in improving performance if you're not doing an animation. Default: `false`.

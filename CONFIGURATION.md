@@ -40,6 +40,7 @@ If this DOM manipulation behavior is undesirable to you, you can supply your own
 - `expressVersion` *[Number]*: Optionally set which version of the Express API to use for route string parsing. Supports values `4` or `5`. Express 3 and below are not supported. Defaults to `5`.
 - `templatingEngine` *[String]*: Which Express templating system to use. You must include the package in your app and supply the module as an argument to this param. This param is required if you use the default render method and do not supply your own.
 - `templates` *[Object]*: Supply an object with keys that are template names and values that are template strings. This param is required if you use the default render method and do not supply your own.
+- `htmlValidator` *[Object]*: Optionally supply an HTML validator to check the markup your templates render. Anything with a `validateStringSync(markup)` or `validateString(markup)` method will do; an [html-validate](https://html-validate.org/) instance is what this was built against. Only relevant if you use the default render method. Default: none.
 - `renderMethod(template, model callback)` *[Function]*: Optionally supply a function to execute when `res.render` is called in your routes. If you do not provide one, a default one will be used that will render your template with your chosen templating engine and make appropriate updates to the DOM. See below for details about what the default render method does specifically and how to customize its behavior.
 - `disableTopbar` *[Boolean]*: Disable the [top bar](https://buunguyen.github.io/topbar/) loading bar. Default: `false` (the loading bar is enabled by default)
 - `topbarConfig` *[Object]*: Options to supply to [top bar](https://buunguyen.github.io/topbar/) to customize its aesthetics and behavior. See the site's documentation for a list of options.
@@ -60,6 +61,7 @@ These constructor params are only relevant if you're not supplying a custom rend
     - `doc` *[String]*: The document object created from the template after it is rendered.
     - `markup` *[String]*: The HTML string that will be written to the page.
     - `targets` *[Array of Strings]*: The list of DOM nodes that will be updated.
+    - `htmlValidation` *[Object]*: The report from the `htmlValidator`, if one is supplied; `null` otherwise.
 - `defaultTarget` *[String]*: Query string representing the default element to target if one is not supplied by `res.target`. Defaults to the `<body>` tag if neither `res.target` or `app.defaultTarget` is supplied.
 - `defaultTargets` *[Array of Strings]*: Array of query strings representing elements to target for replacement if such an array is not supplied by `res.target`. Elements found matching the query strings in the array will be replaced with the corresponding query string from the rendered template.
 - `updateDelay` *[Number]*: How long to wait in milliseconds between rendering the template and writing its contents to the DOM. This is useful to give your animations time to animate if you're using animations. Default: `0`.
@@ -102,7 +104,9 @@ When you call the constructor, it will return an `app` object.
 
 ## Express API implementation
 
-`single-page-express` is a *partial* frontend implementation of the [Express API](https://expressjs.com/en/api.html). Below is a full list of Express API methods and the degree to which it is implemented.
+`single-page-express` is a *partial* frontend implementation of the [Express 5 API](https://expressjs.com/en/5x/api.html). Below is a full list of Express API methods and the degree to which it is implemented.
+
+These docs describe the Express 5 API, which is what `single-page-express` targets by default. Set the `expressVersion` constructor param to `4` to target the [Express 4 API](https://expressjs.com/en/4x/api.html) instead; where the two differ, it is noted below.
 
 ### App constructor methods
 
@@ -130,12 +134,13 @@ When you call the constructor, it will return an `app` object.
 
 #### Properties
 
-- `app.locals` *[Object]*: **Stubbed out**. This will always return `{}` because there is no concept of a "view engine" in `single-page-express`. Instead, you supply a templating system to `single-page-express`'s constructor if you're using the default render method or author your own render method and wire up templating systems yourself.
-- `app.mountpath` *[String]*: **Stubbed out**. This will always return `''` because `single-page-express` does not have a concept of app mounting in the way that Express does. See [feature request](https://github.com/rooseveltframework/single-page-express/issues/4).
+- `app.locals` *[Object]*: Supported as a plain object you can store values on. Note that there is no concept of a "view engine" in `single-page-express`, so unlike Express it is not handed to your templates automatically; pass what you need through the model instead.
+- `app.mountpath` *[String]*: Supported. Returns the path this app was mounted at with `app.use()`, or `''` if it is not mounted on another app.
+- `app.parent` *[Object]*: The app this one is mounted on, or `null`.
 
 #### Events
 
-- `mount`: **Stubbed out** but does nothing  because `single-page-express` does not have a concept of app mounting in the way that Express does. See [feature request](https://github.com/rooseveltframework/single-page-express/issues/4).
+- `mount`: Supported. Fires on an app when it is mounted on another app with `app.use()`, with the parent app as its argument. Apps also support `on()`, `once()`, `off()`, `removeListener()` and `emit()` for this purpose; they are not full Node.js event emitters, and `mount` is the only event `single-page-express` itself fires.
 
 #### Methods
 
@@ -149,18 +154,19 @@ When you call the constructor, it will return an `app` object.
 - `app.get()`: Supported. (Both versions.)
 - `app.listen()`: **Stubbed out** but does nothing because there is no "server" concept in single page app contexts.
 - `app.METHOD()`: Supported.
-- `app.param()`: **Stubbed out** but does nothing because this feature has not been implemented yet. See [feature request](https://github.com/rooseveltframework/single-page-express/issues/1).
-- `app.path()`: **Stubbed out** but does nothing because `single-page-express` does not have a concept of app mounting in the way that Express does. See [feature request](https://github.com/rooseveltframework/single-page-express/issues/4).
+- `app.param()`: Supported. The callback is called as `(req, res, next, value, name)` when a route captures that param, before the route's own handlers, and runs once per request per param. The Express signature that takes an array of names is **not supported**; register each name separately.
+- `app.path()`: Supported. Returns the full path this app was mounted at, walking up through any parent apps.
 - `app.post()`: Supported.
 - `app.put()`: Supported.
 - `app.render()`: Supported.
 - `app.route()`: Supported.
 - `app.set()`: Supported.
-- `app.use()`: **Stubbed out** but does nothing because `single-page-express` does not have a concept of app middleware in the way that Express does. See [feature request](https://github.com/rooseveltframework/single-page-express/issues/2).
+- `app.use()`: Supported. Accepts an optional path, then any number of middleware functions, arrays of them, routers, or other `single-page-express` apps. Middleware runs in registration order for every request whose path it matches, and error handling middleware is identified by its arity of four, as in Express.
+  - One difference from Express, by design: middleware alone will never cause a link or form submit to be captured. `single-page-express` only hijacks an event when a *route* matches it, because middleware registered at `/` would otherwise turn every link on the page, including links to other sites, into a single page app navigation.
 
 ##### New methods defined by single-page-express
 
-- `app.triggerRoute(params)`: This will activate the route callback registered for a given route, as though a link was clicked or a form was POSTed.
+- `app.triggerRoute(params)`: This will activate the route callback registered for a given route, as though a link was clicked or a form was POSTed. Returns a promise that resolves once the route callback has finished, so you can `await` it.
   - Params accepted by `app.triggerRoute` include:
     - `route` *[String]*: Which route you're triggering.
     - `method` *[String]*: e.g. GET, POST, etc. (Case insensitive.)
@@ -171,7 +177,7 @@ When you call the constructor, it will return an `app` object.
 #### Properties
 
 - `req.app` *[Object]*: Supported, however the app object returned will not have all the same properties and methods as Express itself due to the API differences documented above.
-- `req.baseUrl` *[String]*: **Stubbed out**. This will always be `''` because `single-page-express` does not have a concept of app mounting in the way that Express does. See [feature request](https://github.com/rooseveltframework/single-page-express/issues/4).
+- `req.baseUrl` *[String]*: Supported. The path a router or sub-app was mounted at, or `''` for routes registered directly on the app.
 - `req.body` *[Object]*: Supported.
 - `req.cookies` *[Object]*: Supported.
 - `req.fresh` *[Boolean]*: **Stubbed out**. This will always be `true` because there is no request cycle concept in single page app contexts.
@@ -185,19 +191,21 @@ When you call the constructor, it will return an `app` object.
 - `req.protocol` *[String]*: Supported.
 - `req.query` *[String]*: Supported.
 - `req.res` *[Object]*: Supported.
-- `req.route` *[String]*: Supported.
+- `req.route` *[Object]*: Supported. An object with the matched route's `path` and a `methods` object. Express also exposes a `stack` on it; that is **not supported**.
 - `req.secure` *[Boolean]*: Supported.
 - `req.signedCookies` *[Object]*: **Stubbed out**. This will always be `{}` because there is no request cycle concept in single page app contexts.
 - `req.stale` *[Boolean]*: **Stubbed out**. This will always be `false` because there is no request cycle concept in single page app contexts.
 - `req.subdomains` *[Array of Strings]*: Supported.
+- `req.url` *[String]*: Supported. The path being handled, with any mount path removed; `req.originalUrl` keeps the whole thing.
 - `req.xhr` *[Boolean]*: **Stubbed out**. This will always be `true` because there is no request cycle concept in single page app contexts.
-- Other `req` properties [from the Node.js API](https://nodejs.org/api/http.html#class-httpserverresponse): **Not supported**. They are uncommonly used in Express applications, so they are not even stubbed out. See [feature request](https://github.com/rooseveltframework/single-page-express/issues/6).
+- Other `req` properties [from the Node.js API](https://nodejs.org/api/http.html#class-httpincomingmessage): **Stubbed out**. They are uncommonly used in Express applications, so they return inert values rather than doing anything, but they are present so that a route written against them does not crash when it is reused on the frontend. This covers `aborted`, `complete`, `connection`, `headers`, `headersDistinct`, `httpVersion`, `httpVersionMajor`, `httpVersionMinor`, `rawHeaders`, `rawTrailers`, `socket`, `statusCode`, `statusMessage`, `trailers`, `trailersDistinct`, and the readable stream properties `destroyed`, `readable` and `readableEnded`.
 
 #### Methods
 
-All Express request object methods are **stubbed out** but do nothing because because there is no request cycle concept in single page app contexts and all of the Request methods in Express pertain to the HTTP traffic flowing back and forth between the server and client.
+- `req.param()`: Supported. Reads the named value from `req.params`, then `req.body`, then `req.query`, falling back to the default value you pass. It is deprecated in Express, but it is still there, so it is still here.
+- All other Express request object methods (`req.accepts()`, `req.acceptsCharsets()`, `req.acceptsEncodings()`, `req.acceptsLanguages()`, `req.get()`, `req.is()` and `req.range()`) are **stubbed out** but do nothing, because they all pertain to the HTTP traffic flowing back and forth between the server and client, and there is no request cycle in single page app contexts.
 
-Likewise all other `req` methods [from the Node.js API](https://nodejs.org/api/http.html#class-httpserverresponse) are **not supported**. They are uncommonly used in Express applications, so they are not even stubbed out. See [feature request](https://github.com/rooseveltframework/single-page-express/issues/6).
+Likewise all other `req` methods [from the Node.js API](https://nodejs.org/api/http.html#class-httpincomingmessage) are **stubbed out**: `destroy()` and `setTimeout()`, along with the readable stream methods `isPaused()`, `pause()`, `pipe()`, `read()`, `resume()`, `setEncoding()`, `unpipe()`, `unshift()`, `wrap()` and the event emitter methods `addListener()`, `emit()`, `off()`, `on()`, `once()`, `removeAllListeners()` and `removeListener()`. There is no request body stream in the browser, so they do nothing; the ones that return the request in Node.js return it here too, so chaining still works.
 
 #### New properties defined by single-page-express
 
@@ -210,14 +218,14 @@ Likewise all other `req` methods [from the Node.js API](https://nodejs.org/api/h
 #### Properties
 
 - `res.app` *[Object]*: Supported, however the app object returned will not have all the same properties and methods as Express itself due to the API differences documented above.
-- `res.headersSent` *[Boolean]*: **Stubbed out**. This will always be `false` because there is no request cycle concept in single page app contexts.
-- `res.locals` *[Object]*: **Stubbed out**: This will always return `{}` because there is no concept of a "view engine" in `single-page-express`. Instead, you supply a templating system to `single-page-express`'s constructor if you're using the default render method or author your own render method and wire up templating systems yourself.
+- `res.headersSent` *[Boolean]*: **Stubbed out**. This will always be `false` because nothing is ever sent over the wire in single page app contexts.
+- `res.locals` *[Object]*: Supported as a plain object you can store values on for the duration of a request. Note that there is no concept of a "view engine" in `single-page-express`, so unlike Express it is not handed to your templates automatically; pass what you need through the model instead.
 - `res.req` *[Object]*: Supported.
-- Other `res` properties [from the Node.js API](https://nodejs.org/api/http.html#class-httpserverresponse): **Not supported**. They are uncommonly used in Express applications, so they are not even stubbed out. See [feature request](https://github.com/rooseveltframework/single-page-express/issues/6).
+- Other `res` properties [from the Node.js API](https://nodejs.org/api/http.html#class-httpserverresponse): **Stubbed out**. They are uncommonly used in Express applications, so they return inert values rather than doing anything, but they are present so that a route written against them does not crash when it is reused on the frontend. This covers `connection`, `destroyed`, `finished`, `sendDate`, `socket`, `strictContentLength`, `writable`, `writableEnded` and `writableFinished`. `statusCode` and `statusMessage` are real: they record whatever you set, including through `res.status()` and `res.writeHead()`.
 
 ##### New properties defined by single-page-express
 
-- `res.addTargets` *[Array of Strings]*: If using the default render method, use this variable to set an array of query selectors representing elements to target for replacement in addition to whatever is set by `app.defaultTargets`. Elements found matching the query strings in the array will be replaced with the corresponding query string from the rendered template.
+- `res.appendTargets` *[Boolean]*: If using the default render method, set this to `true` to make the target(s) you set with `res.target` apply *in addition to* whatever is set by `app.defaultTarget` or `app.defaultTargets`, rather than replacing them. Has no effect unless `res.target` is also set.
 - `res.afterRender(params)` *[Function]*: If using the default render method, you can set this to a function that will execute after every render.
 - `res.beforeRender(params)` *[Function]*: If using the default render method, you can set this to a function that will execute before every render.
 - `res.focus` *[String]*: If using the default render method, if you set `res.focus`, the browser's focus will be set to that element after the page is rendered. If you do not set `res.focus`, then the browser's focus will be set to the first non-inert element in the DOM with the `autofocus` attribute, or, if none are present, it will be set to whatever the target element was set to for the DOM update.
@@ -236,29 +244,47 @@ Likewise all other `req` methods [from the Node.js API](https://nodejs.org/api/h
 
 #### Methods
 
-- `res.append()`: **Stubbed out** but does nothing because there is no request cycle concept in single page app contexts.
+- `res.append()`: Supported in the sense that headers have no meaning in the browser, but they are recorded, so a route that sets a header and reads it back gets what it set. Appends to an existing header, turning it into an array as Express does.
 - `res.attachment()`: **Stubbed out** but does nothing because there is no request cycle concept in single page app contexts.
 - `res.cookie()`: Supported.
 - `res.clearCookie()`: Supported.
 - `res.download()`: **Stubbed out** but does nothing because there is no request cycle concept in single page app contexts.
-- `res.end()`: **Stubbed out** but does nothing because there is no request cycle concept in single page app contexts.
+- `res.end()`: **Stubbed out** because nothing is ever sent over the wire, but it does set `res.writableEnded` and `res.writableFinished` so that code checking those behaves consistently.
 - `res.format()`: **Stubbed out** but does nothing because there is no request cycle concept in single page app contexts.
-- `res.get()`: **Stubbed out** but does nothing because there is no request cycle concept in single page app contexts.
+- `res.get()`: Supported in the sense that headers have no meaning in the browser, but they are recorded, so a route that sets a header and reads it back gets what it set.
 - `res.json()`: Supported, but behaves differently than Express. This method will log the JSON data to the console.
 - `res.jsonp()`: **Stubbed out** but does nothing because it is not useful in single page app contexts.
 - `res.links()`: **Stubbed out** but does nothing because there is no request cycle concept in single page app contexts.
-- `res.location()`: **Stubbed out** but does nothing because there is no request cycle concept in single page app contexts.
+- `res.location()`: Supported in the sense that headers have no meaning in the browser, but they are recorded, so a route that sets a header and reads it back gets what it set.
 - `res.redirect()`: Supported.
 - `res.render()`: Supported.
 - `res.send()`: **Stubbed out** but does nothing because there is no request cycle concept in single page app contexts.
 - `res.sendFile()`: **Stubbed out** but does nothing because there is no request cycle concept in single page app contexts.
 - `res.sendStatus()`: **Stubbed out** but does nothing because there is no request cycle concept in single page app contexts.
-- `res.set()`: **Stubbed out** but does nothing because there is no request cycle concept in single page app contexts.
-- `res.status()`: **Stubbed out** but does nothing because there is no request cycle concept in single page app contexts.
-- `res.type()`: **Stubbed out** but does nothing because there is no request cycle concept in single page app contexts.
-- `res.vary()`: **Stubbed out** but does nothing because there is no request cycle concept in single page app contexts.
-- Other `res` methods [from the Node.js API](https://nodejs.org/api/http.html#class-httpserverresponse): **Not supported**. They are uncommonly used in Express applications, so they are not even stubbed out. See [feature request](https://github.com/rooseveltframework/single-page-express/issues/6).
+- `res.set()`: Supported in the sense that headers have no meaning in the browser, but they are recorded, so a route that sets a header and reads it back gets what it set. Also accepts an object of several headers at once, and is aliased as `res.header()`.
+- `res.status()`: Supported in the sense that no status is ever sent, but the code is recorded on `res.statusCode` and can be read back.
+- `res.type()`: Supported in the sense that headers have no meaning in the browser, but they are recorded, so a route that sets a header and reads it back gets what it set. Sets `Content-Type` verbatim; unlike Express it does not look up MIME types from an extension.
+- `res.vary()`: Supported in the sense that headers have no meaning in the browser, but they are recorded, so a route that sets a header and reads it back gets what it set.
+- Other `res` methods [from the Node.js API](https://nodejs.org/api/http.html#class-httpserverresponse): **Stubbed out**, so that a route written against them does not crash when it is reused on the frontend. The header methods `appendHeader()`, `getHeader()`, `getHeaderNames()`, `getHeaders()`, `hasHeader()`, `removeHeader()`, `setHeader()` and `writeHead()` are backed by the same store as their Express equivalents, so a route that sets a header and reads it back gets what it set. Nothing is ever sent over the wire, so `addTrailers()`, `cork()`, `uncork()`, `destroy()`, `flushHeaders()`, `setTimeout()`, `write()`, `writeContinue()`, `writeEarlyHints()` and `writeProcessing()` do nothing, as do the event emitter methods `addListener()`, `emit()`, `off()`, `on()`, `once()`, `removeAllListeners()` and `removeListener()`.
 
-### Router object
+### Router
 
-**Not supported**: See [feature request](https://github.com/rooseveltframework/single-page-express/issues/3).
+`singlePageExpress.Router([options])` creates a router, which holds its own stack of middleware and routes and is mounted on an app or another router with `use()`. See [the Express docs](https://expressjs.com/en/5x/api.html#router).
+
+#### Options
+
+- `caseSensitive` *[Boolean]*: Supported. Overrides the app's `case sensitive routing` setting for this router's own routes.
+- `strict` *[Boolean]*: Supported. Overrides the app's `strict routing` setting for this router's own routes.
+- `mergeParams` *[Boolean]*: **Not supported** as an option, because params captured by a mount path are always visible to the routes beneath it, which is what `mergeParams: true` does in Express.
+
+#### Methods
+
+- `router.all()`: Supported.
+- `router.METHOD()`: Supported.
+- `router.param()`: Supported. Works the same way as `app.param()`, for the routes this router holds.
+- `router.route()`: Supported.
+- `router.use()`: Supported.
+
+#### Properties
+
+- `router.stack` *[Array]*: The layers registered on this router, in order. The shape of a layer is an implementation detail and differs from Express's.

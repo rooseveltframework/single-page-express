@@ -1,11 +1,7 @@
-import { fileURLToPath } from 'url'
-import path from 'path'
-import TerserPlugin from 'terser-webpack-plugin'
+const path = require('node:path')
+const TerserPlugin = require('terser-webpack-plugin')
 
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
-
-export default [
+module.exports = [
   // esm
   {
     name: 'main',

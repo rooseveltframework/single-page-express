@@ -33,15 +33,21 @@ const templates = {
   index: '<p>hello world</p>',
   secondPage: '<p>this page has a {variable} in it</p>'
 }
+
+// register the templates with Teddy so it can resolve them by name
+for (const [name, template] of Object.entries(templates)) templatingEngine.setTemplate(name, template)
+
 const app = require('single-page-express')({
   templatingEngine,
   templates
 })
 ```
 
+Note the registration step. `single-page-express` passes the *name* of a template to your templating engine's `render` method, not the template's source, so the engine needs its own copy of each template to look that name up in. Teddy does that with `teddy.setTemplate(name, template)`. Other engines have their own equivalent, and some accept template source directly and need no registration at all; check the documentation for the engine you're using. If you skip this step with Teddy, it will have nothing to resolve the name against and your renders will print the template name instead of the template.
+
 ### Defining routes
 
-The various methods of defining routes [like you would with Express](https://expressjs.com/en/guide/routing.html) are supported.
+The various methods of defining routes [like you would with Express](https://expressjs.com/en/5x/api.html#routing-methods) are supported. These docs target the Express 5 API, which is what `single-page-express` targets by default; see [Targeting Express 4](#targeting-express-4) if you need the Express 4 API instead.
 
 A simple example:
 
@@ -76,13 +82,14 @@ app.route('/route/:with/:params').get(function (req, res) {
   res.render('someTemplate', { some: 'model' })
 })
 
-// route with express 4 wildcard syntax
-app.route('*').get(function (req, res) {
+// wildcard route; in express 5 a wildcard must be named
+app.route('/*all').get(function (req, res) {
+  console.log('req.params.all:', req.params.all)
   res.render('someTemplate', { some: 'model' })
 })
 
-// route with express 5 wildcard syntax
-app.route('*:all').get(function (req, res) {
+// a route that matches every method
+app.all('/routeForEveryMethod', function (req, res) {
   res.render('someTemplate', { some: 'model' })
 })
 
@@ -93,13 +100,181 @@ app.route('/routeWithFormSubmit').post(function (req, res) {
 })
 ```
 
-You can also call `app.triggerRoute(params)` to activate the route callback registered for a given route, as though the link was clicked or a form was POSTed.
+### Middleware
+
+Middleware works the way it does in Express. Register it with `app.use()` and it runs, in registration order, before the route handlers for any path it matches. Call `next()` to hand off to whatever comes next:
+
+```javascript
+// runs for every request
+app.use(function (req, res, next) {
+  req.startedAt = Date.now()
+  next()
+})
+
+// runs only for paths beginning with /admin
+app.use('/admin', function (req, res, next) {
+  if (!loggedIn()) return res.redirect('/login')
+  next()
+})
+```
+
+You can also attach middleware to a single route by passing it ahead of the handler, and you can pass as many handlers as you like:
+
+```javascript
+app.get('/dashboard', requireLogin, loadUser, function (req, res) {
+  res.render('dashboard', { user: req.user })
+})
+```
+
+Error handling middleware takes four arguments, just as in Express. When a handler calls `next(err)`, throws, or rejects, `single-page-express` skips ahead to the next error handling middleware:
+
+```javascript
+app.use(function (err, req, res, next) {
+  console.error(err)
+  res.render('error', { message: err.message })
+})
+```
+
+One thing differs from Express, and it is deliberate: **middleware alone will not capture a link.** `single-page-express` only hijacks a click or form submit when a *route* matches it, because middleware registered at `/` would otherwise turn every link on the page, including links to other sites, into a single page app navigation. Middleware still runs for every request that a route does handle.
+
+### Routers
+
+`singlePageExpress.Router()` creates a router you can register routes and middleware on, then mount with `app.use()`, exactly as in Express:
+
+```javascript
+const singlePageExpress = require('single-page-express')
+const router = singlePageExpress.Router()
+
+router.use(function (req, res, next) {
+  // runs for every request this router handles
+  next()
+})
+
+router.get('/users/:userId', function (req, res) {
+  res.render('user', { userId: req.params.userId })
+})
+
+app.use('/admin', router)
+// the route above now answers to /admin/users/:userId
+```
+
+Routers can be mounted on other routers, params captured by a mount path stay visible to everything beneath it, and `req.baseUrl` reports the path the router was mounted at while `req.url` reports the rest.
+
+### Mounting apps
+
+An entire `single-page-express` app can be mounted on another one, which is how Express sub-apps work:
+
+```javascript
+const subApp = require('single-page-express')({ templatingEngine, templates })
+subApp.get('/page', function (req, res) { res.render('page', {}) })
+
+app.use('/sub', subApp)
+
+subApp.mountpath // '/sub'
+subApp.path()    // '/sub'
+```
+
+A mounted app emits a `mount` event with its parent:
+
+```javascript
+subApp.on('mount', function (parent) {
+  console.log('mounted on', parent)
+})
+```
+
+### Route params
+
+`app.param()` registers a callback that runs when a given param is present in a matched route, before the route's own handlers. It runs once per request per param:
+
+```javascript
+app.param('userId', function (req, res, next, value, name) {
+  req.user = lookUpUser(value)
+  next()
+})
+
+app.get('/users/:userId', function (req, res) {
+  res.render('user', { user: req.user })
+})
+```
+
+Routers have their own `param()` method that works the same way for the routes they hold.
+
+You can also call `app.triggerRoute(params)` to activate the route callback registered for a given route, as though the link was clicked or a form was POSTed. It returns a promise that resolves once the route callback has finished, so you can `await` it.
 
 Params accepted by `app.triggerRoute` include:
 
 - `route`: Which route you're triggering.
 - `method`: e.g. GET, POST, etc. (Case insensitive.)
 - `body`: What to supply to `req.body` if you're triggering a POST.
+
+### Validating your templates
+
+`single-page-express` can run the markup your templates produce through an HTML validator on every render, which is a quick way to catch unclosed tags, missing `alt` attributes, and similar mistakes that a browser will silently paper over.
+
+The validator is not bundled with `single-page-express`, because most apps do not want a validator shipped to production. Install one yourself, create an instance, and hand it to the constructor. [html-validate](https://html-validate.org/) is what this was built against:
+
+```javascript
+const { HtmlValidate } = require('html-validate/browser')
+
+const app = require('single-page-express')({
+  templatingEngine,
+  templates,
+  htmlValidator: new HtmlValidate({ extends: ['html-validate:recommended'] })
+})
+```
+
+Anything with a `validateStringSync(markup)` or `validateString(markup)` method works, so you can supply your own if you prefer a different validator or want to preprocess the markup first.
+
+Problems are reported to the console, naming the template and the line and column within it:
+
+```
+single-page-express: invalid html in the post-rendered template 'index' at line 1, column 16: Element <p> is implicitly closed by parent </div> [no-implicit-close]
+```
+
+Validation never blocks or alters a render; it only tells you what is wrong. The full report is also handed to your render hooks as `params.htmlValidation`, so you can do something else with it:
+
+```javascript
+const app = require('single-page-express')({
+  htmlValidator: new HtmlValidate({ extends: ['html-validate:recommended'] }),
+  afterEveryRender: (params) => {
+    if (params.htmlValidation && !params.htmlValidation.valid) showMyOwnWarningBanner(params.htmlValidation)
+  }
+})
+```
+
+Since this is a development aid, a common approach is to supply the validator only outside of production, so it is tree-shaken out of your production bundle:
+
+```javascript
+htmlValidator: process.env.NODE_ENV === 'production' ? undefined : new HtmlValidate({ extends: ['html-validate:recommended'] })
+```
+
+### Targeting Express 4
+
+These docs describe the Express 5 API, which is what `single-page-express` targets by default. If your Express app is still on Express 4, set `expressVersion` to `4` in the constructor so that route strings are parsed by the Express 4 route parser instead:
+
+```javascript
+const app = require('single-page-express')({
+  expressVersion: 4,
+  templatingEngine,
+  templates
+})
+```
+
+Express 3 and below are not supported.
+
+The difference that comes up most often is wildcard syntax. Express 4 accepts a bare `*`, while Express 5 requires the wildcard to be named:
+
+```javascript
+// express 4
+app.route('*').get(function (req, res) { /* ... */ })
+
+// express 5
+app.route('/*all').get(function (req, res) { /* ... */ })
+```
+
+If you register a route with Express 4 wildcard syntax while targeting Express 5, `single-page-express` will log an error telling you to rename the wildcard, because the Express 5 route parser rejects the pattern outright.
+
+For the rest of the differences between the two, see the [Express 5 migration guide](https://expressjs.com/en/guide/migrating-5.html). Everything else described in these docs — middleware, routers, mounting, `app.param()` — works the same way under both.
 
 ### Controlling scroll position behavior
 
@@ -109,7 +284,7 @@ If you wish to not remember the scroll position on a per route basis, supply `re
 
 ### Running the sample apps
 
-There are 3 sample apps you can run to see demos of how `single-page-express` can be used:
+There are 4 sample apps you can run to see demos of how `single-page-express` can be used:
 
 1. Basic frontend-only sample app:
 
@@ -148,7 +323,7 @@ There are 3 sample apps you can run to see demos of how `single-page-express` ca
      - `cd sampleApps/express-complex`
      - `npm ci`
      - `cd ../../`
-     - `npm run express-express-complex`
+     - `npm run express-complex`
        - Or `npm run sample4`
        - Or `cd` into `sampleApps/express-complex` and run `npm ci` and `npm start`
    - Go to [http://localhost:3000](http://localhost:3000)
