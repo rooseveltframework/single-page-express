@@ -3,6 +3,7 @@ const app = window.singlePageExpress({
 })
 
 // define routes
+//
 // using the app.METHOD syntax
 app.get('/', function (req, res) {
   console.log('req object:', req)
@@ -24,8 +25,7 @@ app.route('/test/:with/:params').get(function (req, res) {
   res.render('someOtherTemplate', { someOther: 'model' })
 })
 
-// test with wildcards
-// which wildcard syntax to use depends on which version of the express api you target
+// test with wildcards; which wildcard syntax to use depends on which version of the express api you target
 const wildcardRoute = app.expressVersion === 5 ? '/wildcard/*all' : '/wildcard/*'
 app.route(wildcardRoute).get(function (req, res) {
   console.log('req object:', req)

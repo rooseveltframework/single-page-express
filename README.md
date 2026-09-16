@@ -1,6 +1,6 @@
 📄 **single-page-express** [![npm](https://img.shields.io/npm/v/single-page-express.svg)](https://www.npmjs.com/package/single-page-express)
 
-A client-side implementation of the [Express](http://expressjs.com) route API. It works by hijacking links and form submits, then providing a direct imitation of the Express route API to handle "requests" (click or submit events) and issue "responses" in the form of DOM updates.
+A client-side implementation of the [Express](https://expressjs.com) route API. It works by hijacking links and form submits, then providing a direct imitation of the Express route API to handle "requests" (click or submit events) and issue "responses" in the form of DOM updates.
 
 When a `single-page-express` route is triggered, it will update the browser history state to match the route accordingly, update the scroll position appropriately, set focus appropriately, will start a [view transition](https://developer.mozilla.org/en-US/docs/Web/API/View_Transition_API) to animate the DOM updates, and there are hooks available to customize the animations as well. If view transitions are not supported in the browser, the page will transition, but it will not animate unless you set a custom animation using another animation technique.
 
@@ -32,6 +32,6 @@ This module was built and is maintained by the [Roosevelt web framework](https:/
 
 - Like Express, this module is unopinionated about what templating engine you use for rendering HTML templates. Use any templating engine that supports Express.
 
-- The default render method includes many smart defaults, including easy hooks for setting the page title, updating children of the `<head>` tag, automatic support for announcing template renders as new pages to screen readers, setting browser focus to the correct element, and more. The specifics of the default render method's behavior are detailed below, and you can replace the default render method with your own if you prefer different behavior.
+- The default render method includes many smart defaults, including easy hooks for setting the page title, updating children of the `<head>` tag, automatic support for announcing template renders as new pages to screen readers, setting browser focus to the correct element, and more. The specifics of the default render method's behavior are detailed in the [configuration documentation](./CONFIGURATION.md), and you can replace the default render method with your own if you prefer different behavior.
 
 Don't build a SPA (single page app), build a SPE (single page Express) app!

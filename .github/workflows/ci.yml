@@ -4,8 +4,9 @@ jobs:
   test:
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false # show all CI failures rather than stopping CI on first failure
       matrix:
-        node-version: [22.x, 24.x]
+        node-version: [22.x, 24.x, 26.x]
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
       - uses: actions/checkout@v7
@@ -14,6 +15,9 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
       - run: npm ci
-      - run: npx playwright install
+      # the test suite boots the express-complex sample app, which has its own dependencies
+      - run: npm ci
+        working-directory: sampleApps/express-complex
+      - run: npx playwright install chromium firefox
       - run: npm run lint
       - run: npm t

@@ -8,7 +8,7 @@
       "url": "https://github.com/rooseveltframework/single-page-express/graphs/contributors"
     }
   ],
-  "version": "2.0.5",
+  "version": "2.1.0",
   "files": [
     "dist",
     "*.md"
@@ -24,32 +24,39 @@
   },
   "homepage": "https://rooseveltframework.org/docs/single-page-express/latest",
   "license": "CC-BY-4.0",
+  "engines": {
+    "node": ">=22.0.0"
+  },
   "main": "single-page-express.js",
   "dependencies": {
-    "path-to-regexp": "8.3.0",
-    "path-to-regexp-express4": "npm:path-to-regexp@0.1.12",
+    "path-to-regexp": "8.4.2",
+    "path-to-regexp-express4": "npm:path-to-regexp@0.1.13",
     "topbar": "3.0.1"
   },
   "devDependencies": {
-    "@playwright/test": "1.58.2",
     "express": "5.2.1",
+    "html-validate": "11.16.0",
+    "playwright": "1.63.0",
     "standard": "17.1.2",
-    "teddy": "1.1.4",
-    "webpack-cli": "6.0.1"
+    "teddy": "2.0.2",
+    "terser-webpack-plugin": "5.6.1",
+    "webpack": "5.111.0",
+    "webpack-cli": "7.2.3"
   },
   "scripts": {
     "build": "webpack",
-    "sample-app-basic-frontend-only": "node -e \"const { execSync } = require('child_process'); const express = require('express'); const path = require('path'); try { execSync('npm run build', { stdio: 'inherit' }); const app = express(); app.use(express.static(path.join(__dirname, 'sampleApps', 'basicFrontendOnly'))); app.use(express.static(path.join(__dirname, 'dist'))); app.listen(3000, () => { console.log('\\n🎧 single-page-express basic frontend-only sample app server is running on http://localhost:3000'); }); } catch (error) { console.error('Failed to start sample app:', error.message); }\"",
-    "sample1": "npm run sample-app-basic-frontend-only",
-    "sample-app-basic-frontend-only-with-templating": "node -e \"const { execSync } = require('child_process'); const express = require('express'); const path = require('path'); try { execSync('npm run build', { stdio: 'inherit' }); const app = express(); app.use(express.static(path.join(__dirname, 'sampleApps', 'basicFrontendOnlyWithTemplating'))); app.use(express.static(path.join(__dirname, 'dist'))); app.use(express.static(path.join(__dirname, 'node_modules', 'teddy', 'dist'))); app.listen(3000, () => { console.log('\\n🎧 single-page-express basic frontend-only with templating sample app server is running on http://localhost:3000'); }); } catch (error) { console.error('Failed to start sample app:', error.message); }\"",
-    "sample2": "npm run sample-app-basic-frontend-only-with-templating",
-    "express-sample": "node -e \"process.chdir('sampleApps/express'); require('./sampleApps/express/server.js')\"",
-    "sample3": "npm run express-sample",
-    "express-complex": "node -e \"process.chdir('sampleApps/express-complex'); require('./sampleApps/express-complex/server.js')\"",
-    "sample4": "npm run express-complex",
+    "sample-app-basic-frontend-only": "node scripts/serve-sample-app.js basicFrontendOnly",
+    "sample1": "node --run sample-app-basic-frontend-only",
+    "sample-app-basic-frontend-only-with-templating": "node scripts/serve-sample-app.js basicFrontendOnlyWithTemplating",
+    "sample2": "node --run sample-app-basic-frontend-only-with-templating",
+    "express-sample": "cd sampleApps/express && node server.js",
+    "sample3": "node --run express-sample",
+    "express-complex": "cd sampleApps/express-complex && node server.js",
+    "sample4": "node --run express-complex",
     "lint": "standard",
     "lint-fix": "standard --fix",
-    "test": "npm run build && playwright test"
+    "test": "node --run build && node --test",
+    "coverage": "node --run build && node --test --experimental-test-coverage"
   },
   "standard": {
     "ignore": [
