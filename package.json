@@ -30,7 +30,7 @@
   "main": "single-page-express.js",
   "dependencies": {
     "path-to-regexp": "8.4.2",
-    "path-to-regexp-express4": "npm:path-to-regexp@0.1.13",
+    "path-to-regexp-express4": "npm:path-to-regexp@8.4.0",
     "topbar": "3.0.1"
   },
   "devDependencies": {
