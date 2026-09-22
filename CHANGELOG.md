@@ -1,3 +1,11 @@
+## 2.1.1
+
+- Added `singlePageExpress.htmlValidateConfig`, an [html-validate](https://html-validate.org/) config to hand the `htmlValidator` param. It is `html-validate:recommended` with `attribute-boolean-style` and `attribute-empty-style` turned off, by default.
+- Added `topbarDelay`, which is how long a navigation has to still be working before the top bar appears at all, defaulting to 250ms. Set it to `0` for the previous behavior of showing the bar the moment a navigation starts.
+- Fixed the top bar vanishing the moment a view transition started and reappearing when it ended.
+- Fixed the listener that scrolled the page after a view transition never being removed. Each navigation added another one, so the tenth navigation ran ten of them, each restoring the scroll position of whichever page it had been created for.
+- Updated dependencies
+
 ## 2.1.0
 
 - Added support for Express middleware. `app.use()` accepts an optional path followed by any number of middleware functions, arrays of them, routers, or other apps, and error handling middleware is identified by its arity of four, as in Express. Middleware alone will never cause a link or form submit to be captured; only a matching route does that.

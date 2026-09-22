@@ -214,12 +214,24 @@ Params accepted by `app.triggerRoute` include:
 The validator is not bundled with `single-page-express`, because most apps do not want a validator shipped to production. Install one yourself, create an instance, and hand it to the constructor. [html-validate](https://html-validate.org/) is what this was built against:
 
 ```javascript
+const singlePageExpress = require('single-page-express')
 const { HtmlValidate } = require('html-validate/browser')
 
-const app = require('single-page-express')({
+const app = singlePageExpress({
   templatingEngine,
   templates,
-  htmlValidator: new HtmlValidate({ extends: ['html-validate:recommended'] })
+  htmlValidator: new HtmlValidate(singlePageExpress.htmlValidateConfig)
+})
+```
+
+`singlePageExpress.htmlValidateConfig` is `html-validate:recommended` with two rules turned off: `attribute-boolean-style` and `attribute-empty-style`. Turning off those rules is needed to prevent situations like a template that says `<script defer>` arriving as `<script defer="">` producing a validation error. Every rule that finds a real problem is left on.
+
+To inherit and extend those rules:
+
+```javascript
+htmlValidator: new HtmlValidate({
+  ...singlePageExpress.htmlValidateConfig,
+  rules: { ...singlePageExpress.htmlValidateConfig.rules, 'no-inline-style': 'error' }
 })
 ```
 
@@ -234,19 +246,25 @@ single-page-express: invalid html in the post-rendered template 'index' at line 
 Validation never blocks or alters a render; it only tells you what is wrong. The full report is also handed to your render hooks as `params.htmlValidation`, so you can do something else with it:
 
 ```javascript
-const app = require('single-page-express')({
-  htmlValidator: new HtmlValidate({ extends: ['html-validate:recommended'] }),
+const app = singlePageExpress({
+  htmlValidator: new HtmlValidate(singlePageExpress.htmlValidateConfig),
   afterEveryRender: (params) => {
     if (params.htmlValidation && !params.htmlValidation.valid) showMyOwnWarningBanner(params.htmlValidation)
   }
 })
 ```
 
-Since this is a development aid, a common approach is to supply the validator only outside of production, so it is tree-shaken out of your production bundle:
+Since this is a development aid, a common approach is to supply the validator only outside of production, so that your bundler drops it from a production build:
 
 ```javascript
-htmlValidator: process.env.NODE_ENV === 'production' ? undefined : new HtmlValidate({ extends: ['html-validate:recommended'] })
+htmlValidator: process.env.NODE_ENV === 'production'
+  ? undefined
+  : new (require('html-validate/browser').HtmlValidate)(singlePageExpress.htmlValidateConfig)
 ```
+
+Note where the `require` sits. It has to be **inside** the conditional: a validator required at the top of the file is bundled whether or not the branch that uses it survives, which is around half a megabyte of production bundle doing nothing. Put it inside and the whole branch goes, along with everything it would have pulled in.
+
+Webpack and Rspack replace `process.env.NODE_ENV` on their own, and esbuild derives it from whether the build is minified. Rollup does neither, so a Rollup build needs [@rollup/plugin-replace](https://www.npmjs.com/package/@rollup/plugin-replace) to substitute it, and [@rollup/plugin-json](https://www.npmjs.com/package/@rollup/plugin-json) to read the JSON `html-validate`'s own dependencies import.
 
 ### Targeting Express 4
 

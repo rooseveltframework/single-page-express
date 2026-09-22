@@ -36,7 +36,10 @@ for (const sampleApp of sampleApps) {
         beforeEach(async () => {
           if (page) await page.close()
           page = await browser.newPage({ baseURL })
-          page.on('console', message => console.log(message.text()))
+          // the browser console is only echoed when asked for: these tests deliberately drive paths that log, such as a render with no templating engine, and forwarding all of it buries the test results it is interleaved with
+          //
+          // run with SPE_TEST_CONSOLE=1 to see it when debugging a failure
+          if (process.env.SPE_TEST_CONSOLE) page.on('console', message => console.log(message.text()))
         })
 
         // navigates by clicking a link and reports whether the router handled it client side

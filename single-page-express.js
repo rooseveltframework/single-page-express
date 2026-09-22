@@ -347,6 +347,7 @@ function singlePageExpress (options) {
   app.postRenderCallbacks = options.postRenderCallbacks || {} // list of callback functions to execute after a render event occurs
   app.topbarEnabled = !options.disableTopbar // whether to use topbar https://buunguyen.github.io/topbar/
   app.topBarRoutes = options.topBarRoutes // which routes to use the topbar on; defaults to all if this option is not supplied
+  app.topbarDelay = options.topbarDelay ?? 250 // how long a navigation has to be still working before the top bar appears at all; set it to 0 to show the bar the moment a navigation starts
   if (app.topbarEnabled || app.topBarRoutes) {
     app.topbar = require('topbar')
     app.topbar.config(options.topbarConfig || {
@@ -362,6 +363,67 @@ function singlePageExpress (options) {
   app.urls = {} // list of URLs that have been visited and metadata about them
   let currentRoute = window.location.pathname // the route currently on screen; the back and forward buttons update window.location before popstate fires, so this is what says which page is being left
   let currentViewTransition // a global reference to the current view transition so we can know when it has ended
+
+  // a client side navigation usually has its content ready in a few milliseconds, and a progress bar that appears for something already finished reads as a glitch rather than as progress: it crawls along on its own timer, then jumps to the end the moment it is told to hide
+  //
+  // so the bar is scheduled rather than shown, and a navigation that produces its update before the delay is up cancels it and never shows anything at all
+  let topbarTimer = null
+  let topbarShowing = false
+  const topbarFadeDuration = 120 // long enough to read as a fade, short enough that holding the page back for it does not matter
+
+  function topbarWantedFor (route) {
+    return (app.topbarEnabled && !app.topBarRoutes) || app.topBarRoutes?.includes?.(route)
+  }
+
+  function scheduleTopbar (route) {
+    if (!topbarWantedFor(route)) return
+    window.clearTimeout(topbarTimer)
+    topbarTimer = window.setTimeout(() => {
+      topbarTimer = null
+      topbarShowing = true
+      app.topbar.show()
+    }, parseInt(app.topbarDelay) || 0)
+  }
+
+  // the navigation has something to show, so a bar that has not appeared yet is no longer needed, and one that has is finished reporting
+  //
+  // this is also the last moment it can be taken off screen: a view transition paints its capture of the page rather than the live document, so a bar still showing when one starts freezes for the length of the animation and then disappears when the live page comes back, which reads as a flash
+  //
+  // nothing can keep painting through a transition, not a z-index and not the top layer, so the only fix is to be gone before it starts
+  function contentReady () {
+    window.clearTimeout(topbarTimer)
+    topbarTimer = null
+    if (!topbarShowing) return Promise.resolve()
+    topbarShowing = false
+
+    const canvas = document.querySelector('canvas[role=presentation]')
+    if (!canvas) {
+      app.topbar.hide()
+      return Promise.resolve()
+    }
+
+    // the bar fades out where it stands rather than running out to the right hand edge first
+    //
+    // it has to be gone before the page changes, because a view transition paints its capture of the page rather than the live document, and a bar still on screen when one starts freezes where it is and then vanishes when the live page comes back
+    //
+    // that makes every millisecond it spends finishing a millisecond the reader waits for content that is already there, so this is kept short: letting topbar play its own hide out in full costs several hundred
+    canvas.style.transition = `opacity ${topbarFadeDuration}ms`
+    canvas.style.opacity = 0
+
+    return new Promise(resolve => window.setTimeout(() => {
+      canvas.hidden = true
+      canvas.style.transition = '' // so the next navigation's bar appears at once instead of fading in
+      app.topbar.hide() // resets topbar's own state for the next navigation, on a canvas that is already off screen
+      resolve()
+    }, topbarFadeDuration))
+  }
+
+  let pageSettledCallback
+  function claimPageSettledCallback () {
+    const callback = pageSettledCallback
+    pageSettledCallback = null
+    return () => { if (typeof callback === 'function') callback() }
+  }
 
   // #endregion
 
@@ -720,7 +782,7 @@ function singlePageExpress (options) {
       params.event?.preventDefault()
 
       // show top bar
-      if ((app.topbarEnabled && !app.topBarRoutes) || app.topBarRoutes?.includes?.(routeWithoutQuery)) app.topbar.show()
+      scheduleTopbar(routeWithoutQuery)
 
       // save scroll position of current page before moving to the next page
       app.urls[currentRoute] = {
@@ -850,11 +912,11 @@ function singlePageExpress (options) {
         }
         res.resetScroll = null // clear this var so it does not persist on the next request; allow routes to opt-in
 
-        // hide top bar (loading completed)
-        if ((app.topbarEnabled && !app.topBarRoutes) || app.topBarRoutes?.includes?.(routeWithoutQuery)) app.topbar.hide()
+        // a backstop: the bar is normally taken down the moment the render has markup, which is well before this, but a navigation that settles without having got that far should not leave one on screen
+        contentReady()
       }
-      if (currentViewTransition) document.addEventListener('animationend', scrollPage) // scroll the page after view transitions or css animations are done
-      else window.setTimeout(scrollPage, parseInt(res.updateDelay) || parseInt(app.updateDelay) || 0) // scroll page after user-defined animation finishes; delay the scroll until after the render by using the same delay mechanism as the default render method
+      // the render runs this once its update is done, because it is the only thing that knows when that is
+      pageSettledCallback = scrollPage
     }
   }
 
@@ -1075,7 +1137,7 @@ function singlePageExpress (options) {
 
             // update DOM after all link tags and script tags have finished loading
             Promise.all(loadPromises).then(() => {
-              window.setTimeout(() => {
+              window.setTimeout(async () => {
                 const domUpdate = () => {
                   let updatedATarget = false
 
@@ -1151,8 +1213,17 @@ function singlePageExpress (options) {
                     if (originalTabindex !== null) targetEl.setAttribute('tabindex', originalTabindex)
                   }
                 }
-                if (document.startViewTransition && !thisSkipViewTransition && !app.alwaysSkipViewTransition) currentViewTransition = document.startViewTransition(domUpdate)
-                else domUpdate()
+                // this render claims whatever navigation is waiting on it, so that a transition interrupted by the next navigation settles its own page rather than consuming the one that interrupted it
+                const settleThisPage = claimPageSettledCallback()
+                await contentReady() // there is markup to show, so the top bar has finished reporting; let it play out before anything captures the page
+
+                if (document.startViewTransition && !thisSkipViewTransition && !app.alwaysSkipViewTransition) {
+                  currentViewTransition = document.startViewTransition(domUpdate)
+                  currentViewTransition.finished.then(settleThisPage, settleThisPage) // a transition that is skipped or interrupted still has to settle the page
+                } else {
+                  domUpdate()
+                  window.setTimeout(settleThisPage, parseInt(thisUpdateDelay) || parseInt(app.updateDelay) || 0) // give a css animation the same amount of time the update itself was given
+                }
               }, parseInt(thisUpdateDelay) || parseInt(app.updateDelay) || 0)
             })
           }
@@ -1210,5 +1281,18 @@ function singlePageExpress (options) {
 
 // see https://expressjs.com/en/5x/api.html#router
 singlePageExpress.Router = (routerOptions) => createRouter(routerOptions)
+
+// an html-validate config to hand the htmlValidator param, for anyone who does not want to work out which of its rules a rendered template can actually satisfy
+//
+// the two rules turned off here are about how markup is written by hand, and what gets checked is markup a templating engine produced rather than anything anybody typed: an engine that renders through the DOM, which most of them do in a browser, gets every boolean attribute written back with an empty value, so `defer` arrives as `defer=""` however the template spelled it and no edit to a template could satisfy them
+//
+// pass it as it is, or spread it into a config of your own; every rule that finds a real problem is left on
+singlePageExpress.htmlValidateConfig = Object.freeze({
+  extends: ['html-validate:recommended'],
+  rules: Object.freeze({
+    'attribute-boolean-style': 'off',
+    'attribute-empty-style': 'off'
+  })
+})
 
 module.exports = singlePageExpress

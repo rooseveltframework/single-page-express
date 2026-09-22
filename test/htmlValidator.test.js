@@ -70,6 +70,44 @@ for (const browserName of browsers) {
       })
     })
 
+    // a templating engine that renders through the dom, which most of them do in a browser, hands back every boolean attribute with an empty value; the style rules in `recommended` flag that, and no edit to a template can satisfy them
+    describe('the config single-page-express recommends', () => {
+      const domRendered = '<div id="app"><p hidden="">dash</p><script src="/x.js" defer=""></script></div>'
+      const recommended = '{ htmlValidator: new window.htmlValidate.HtmlValidate(window.singlePageExpress.htmlValidateConfig) }'
+
+      test('recommended on its own complains about markup a dom based engine produced', { timeout }, async () => {
+        await loadHtmlValidate()
+        const report = await render(domRendered, { appOptions: realValidator })
+        assert.equal(report.valid, false)
+        assert.deepEqual(report.rules.sort(), ['attribute-boolean-style', 'attribute-empty-style'])
+      })
+
+      test('the recommended config leaves that markup alone', { timeout }, async () => {
+        await loadHtmlValidate()
+        const report = await render(domRendered, { appOptions: recommended })
+        assert.equal(report.valid, true, `expected nothing to report, got: ${JSON.stringify(report.rules)}`)
+        assert.deepEqual(page.consoleLines.filter(line => line.text.includes('invalid html')), [])
+      })
+
+      // the config is a starting point, not a ceiling: an app spreads it and says whatever it wants on top, including switching one of the two back on
+      test('lets an app add its own rules and override what it turns off', { timeout }, async () => {
+        await loadHtmlValidate()
+        const ownRules = "{ htmlValidator: new window.htmlValidate.HtmlValidate({ ...window.singlePageExpress.htmlValidateConfig, rules: { ...window.singlePageExpress.htmlValidateConfig.rules, 'attribute-boolean-style': 'error' } }) }"
+        const report = await render(domRendered, { appOptions: ownRules })
+
+        assert.equal(report.valid, false)
+        assert.ok(report.rules.includes('attribute-boolean-style'), `the app asked for this one back, got: ${JSON.stringify(report.rules)}`)
+        assert.ok(!report.rules.includes('attribute-empty-style'), 'the one it did not mention should still be off')
+      })
+
+      test('and still catches what is actually wrong', { timeout }, async () => {
+        await loadHtmlValidate()
+        const report = await render('<div id="app"><p>unclosed<img src="x.png"></div>', { appOptions: recommended })
+        assert.equal(report.valid, false)
+        assert.deepEqual(report.rules.sort(), ['no-implicit-close', 'wcag/h37'])
+      })
+    })
+
     describe('with any compatible validator', () => {
       test('accepts a synchronous validator', { timeout }, async () => {
         const report = await render('<div id="app">x</div>', {
