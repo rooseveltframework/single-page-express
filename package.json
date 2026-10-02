@@ -35,7 +35,7 @@
   },
   "devDependencies": {
     "express": "5.2.1",
-    "html-validate": "11.16.0",
+    "html-validate": "11.16.1",
     "playwright": "1.63.0",
     "standard": "17.1.2",
     "teddy": "2.0.4",
