@@ -2,7 +2,7 @@
   "name": "single-page-express-sample-app",
   "main": "server.js",
   "dependencies": {
-    "express": "5.2.1",
+    "express": "5.3.0",
     "module-alias": "2.3.4",
     "teddy": "2.0.4",
     "webpack": "5.111.1"
