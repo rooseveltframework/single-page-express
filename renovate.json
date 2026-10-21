@@ -12,6 +12,11 @@
   "minimumReleaseAge": "5 days",
   "packageRules": [
     {
+      "description": "the roosevelt framework's own modules are exempt from the wait",
+      "matchSourceUrls": ["https://github.com/rooseveltframework/**"],
+      "minimumReleaseAge": "0 days"
+    },
+    {
       "matchPackageNames": ["path-to-regexp-express4"],
       "allowedVersions": "~0.1.0"
     }
