@@ -360,7 +360,14 @@ function singlePageExpress (options) {
   }
   app.alwaysSkipViewTransition = options.alwaysSkipViewTransition // never wrap dom updates in document.startViewTransition() calls
   app.alwaysScrollTop = options.alwaysScrollTop // always scroll to the top of the page after every render
-  app.urls = {} // list of URLs that have been visited and metadata about them
+  app.scrollRestoration = options.scrollRestoration ?? true // remember each page's scroll position, and put it back on returning to the page
+  app.manageFocus = options.manageFocus ?? true // move focus to the new content after every render, for keyboard and screen reader users
+  app.announcePageChange = options.announcePageChange ?? true // announce the new page to screen readers after every render
+
+  // where navigations are recorded: 'browser' records them in the browser's own history, so the url changes and the back and forward buttons work; 'memory' records them in a history of the app's own, which app.back() and app.forward() move through without touching the url, which suits a page loaded from a file, as in an electron app, where a url changed by pushState names a file that isn't there; 'none' records nothing
+  app.historyMode = ['browser', 'memory', 'none'].includes(options.history) ? options.history : 'browser'
+  const memoryHistory = { entries: [], index: -1 }
+  app.urls = {} // list of URLs that have been visited and metadata about them, keyed by route, query and body
   let currentRoute = window.location.pathname // the route currently on screen; the back and forward buttons update window.location before popstate fires, so this is what says which page is being left
   let currentViewTransition // a global reference to the current view transition so we can know when it has ended
 
@@ -416,6 +423,16 @@ function singlePageExpress (options) {
       app.topbar.hide() // resets topbar's own state for the next navigation, on a canvas that is already off screen
       resolve()
     }, topbarFadeDuration))
+  }
+
+  // each navigation a route handles is tracked, so that awaiting app.triggerRoute waits for what it renders, and a navigation that starts while an earlier one is still working supersedes it: the earlier one's req.signal is aborted, and anything it goes on to render is not written to the page
+  //
+  // a get request is a page navigation, so it supersedes the navigations before it as it starts. any other method supersedes them only once it renders, since a form posted to a route that only does some work and renders nothing shouldn't stop a page from rendering
+  let latestNavigation = null
+  const navigationOf = new WeakMap() // response object => the navigation it belongs to
+  function supersede (navigation) {
+    if (latestNavigation && latestNavigation !== navigation) latestNavigation.controller.abort()
+    latestNavigation = navigation
   }
 
   let pageSettledCallback
@@ -527,7 +544,7 @@ function singlePageExpress (options) {
   // req.path is defined at runtime below
   // req.protocol is defined at runtime below
   // req.query is defined at runtime below
-  // req.res is defined below because res is not initialized yet
+  // req.res is set for each request, along with the response object it gets
   // req.route is defined at runtime below
   // req.secure is defined at runtime below
   defaultReq.signedCookies = {} // stubbed out
@@ -598,156 +615,160 @@ function singlePageExpress (options) {
 
   // #region response object
 
-  const res = {}
+  // every request gets a response object of its own, so a navigation that starts while another is still rendering cannot change what the other one renders, or where
+  function createResponse () {
+    const res = {}
 
-  // response object properties
-  res.app = app
-  res.headersSent = false // nothing is ever sent over the wire, so headers are never sent
-  res.locals = {}
+    // response object properties
+    res.app = app
+    res.headersSent = false // nothing is ever sent over the wire, so headers are never sent
+    res.locals = {}
 
-  // headers have no meaning in the browser, but they are recorded so that a route that sets one and reads it back behaves consistently
-  const headers = new Map() // keyed by lowercased header name, holding the name as written and its value
-  const headerKey = (name) => ('' + name).toLowerCase()
-  // res.req defined at runtime below
+    // headers have no meaning in the browser, but they are recorded so that a route that sets one and reads it back behaves consistently
+    const headers = new Map() // keyed by lowercased header name, holding the name as written and its value
+    const headerKey = (name) => ('' + name).toLowerCase()
+    // res.req defined at runtime below
 
-  // response object methods
-  res.append = (name, value) => {
-    const existing = headers.get(headerKey(name))?.value
-    if (existing === undefined) return res.set(name, value)
-    return res.set(name, [].concat(existing).concat(value))
-  }
-  res.attachment = () => { return res } // stubbed out
-  res.cookie = (name, value, options = {}) => {
-    const {
-      domain,
-      encode = encodeURIComponent,
-      expires,
-      httpOnly,
-      maxAge,
-      path = '/',
-      partitioned,
-      priority,
-      secure,
-      signed,
-      sameSite
-    } = options
-    let cookieString = `${encode(name)}=${encode(value)}`
-    if (expires instanceof Date) cookieString += `; expires=${expires.toUTCString()}`
-    if (maxAge) cookieString += `; max-age=${maxAge}`
-    if (domain) cookieString += `; domain=${domain}`
-    if (path) cookieString += `; path=${path}`
-    if (secure) cookieString += '; secure'
-    if (httpOnly) cookieString += '; HttpOnly'
-    if (sameSite) cookieString += `; SameSite=${sameSite}`
-    if (partitioned) cookieString += '; Partitioned'
-    if (priority) cookieString += `; Priority=${priority}`
-    if (signed) {
-      if (app.appVars.env === 'development') console.warn('Signed cookies are not supported in the browser context.')
+    // response object methods
+    res.append = (name, value) => {
+      const existing = headers.get(headerKey(name))?.value
+      if (existing === undefined) return res.set(name, value)
+      return res.set(name, [].concat(existing).concat(value))
     }
-    document.cookie = cookieString
-  }
-  res.clearCookie = (name, options = {}) => {
-    const {
-      domain,
-      encode = encodeURIComponent,
-      httpOnly,
-      path = '/',
-      partitioned,
-      priority,
-      secure,
-      signed,
-      sameSite
-    } = options
-    const pastDate = new Date(0).toUTCString() // set the cookie's expiration date to a past date
-    let cookieString = `${encode(name)}=; expires=${pastDate}`
-    if (domain) cookieString += `; domain=${domain}`
-    if (path) cookieString += `; path=${path}`
-    if (secure) cookieString += '; secure'
-    if (httpOnly) cookieString += '; HttpOnly'
-    if (sameSite) cookieString += `; SameSite=${sameSite}`
-    if (partitioned) cookieString += '; Partitioned'
-    if (priority) cookieString += `; Priority=${priority}`
-    if (signed) console.warn('Signed cookies are not supported in the frontend.')
-    document.cookie = cookieString
-  }
-  res.download = () => { return res } // stubbed out
-  res.end = () => { res.writableEnded = true; res.writableFinished = true; return res } // nothing is sent over the wire, but the flags it sets are observable
-  res.format = () => { return res } // stubbed out
-  res.get = (name) => headers.get(headerKey(name))?.value
-  res.json = (json) => {
-    console.log(json)
-    return res
-  }
-  res.jsonp = () => { return res } // stubbed out
-  res.links = () => { return res } // stubbed out
-  res.location = (url) => res.set('Location', url)
-  res.redirect = (status, route) => {
-    if (!route) route = status
-    handleRoute({ route })
-    return res
-  }
-  // res.render is defined below
-  res.send = () => { return res } // stubbed out
-  res.sendFile = () => { return res } // stubbed out
-  res.sendStatus = () => { return res } // stubbed out
-  res.set = (name, value) => {
-    if (name && typeof name === 'object') { // res.set() accepts an object of several headers at once
-      for (const [key, val] of Object.entries(name)) res.set(key, val)
+    res.attachment = () => { return res } // stubbed out
+    res.cookie = (name, value, options = {}) => {
+      const {
+        domain,
+        encode = encodeURIComponent,
+        expires,
+        httpOnly,
+        maxAge,
+        path = '/',
+        partitioned,
+        priority,
+        secure,
+        signed,
+        sameSite
+      } = options
+      let cookieString = `${encode(name)}=${encode(value)}`
+      if (expires instanceof Date) cookieString += `; expires=${expires.toUTCString()}`
+      if (maxAge) cookieString += `; max-age=${maxAge}`
+      if (domain) cookieString += `; domain=${domain}`
+      if (path) cookieString += `; path=${path}`
+      if (secure) cookieString += '; secure'
+      if (httpOnly) cookieString += '; HttpOnly'
+      if (sameSite) cookieString += `; SameSite=${sameSite}`
+      if (partitioned) cookieString += '; Partitioned'
+      if (priority) cookieString += `; Priority=${priority}`
+      if (signed) {
+        if (app.appVars.env === 'development') console.warn('Signed cookies are not supported in the browser context.')
+      }
+      document.cookie = cookieString
+    }
+    res.clearCookie = (name, options = {}) => {
+      const {
+        domain,
+        encode = encodeURIComponent,
+        httpOnly,
+        path = '/',
+        partitioned,
+        priority,
+        secure,
+        signed,
+        sameSite
+      } = options
+      const pastDate = new Date(0).toUTCString() // set the cookie's expiration date to a past date
+      let cookieString = `${encode(name)}=; expires=${pastDate}`
+      if (domain) cookieString += `; domain=${domain}`
+      if (path) cookieString += `; path=${path}`
+      if (secure) cookieString += '; secure'
+      if (httpOnly) cookieString += '; HttpOnly'
+      if (sameSite) cookieString += `; SameSite=${sameSite}`
+      if (partitioned) cookieString += '; Partitioned'
+      if (priority) cookieString += `; Priority=${priority}`
+      if (signed) console.warn('Signed cookies are not supported in the frontend.')
+      document.cookie = cookieString
+    }
+    res.download = () => { return res } // stubbed out
+    res.end = () => { res.writableEnded = true; res.writableFinished = true; return res } // nothing is sent over the wire, but the flags it sets are observable
+    res.format = () => { return res } // stubbed out
+    res.get = (name) => headers.get(headerKey(name))?.value
+    res.json = (json) => {
+      console.log(json)
       return res
     }
-    headers.set(headerKey(name), { name, value })
+    res.jsonp = () => { return res } // stubbed out
+    res.links = () => { return res } // stubbed out
+    res.location = (url) => res.set('Location', url)
+    res.redirect = (status, route) => {
+      if (!route) route = status
+      handleRouteFromPage({ route })
+      return res
+    }
+    // res.render is defined below
+    res.send = () => { return res } // stubbed out
+    res.sendFile = () => { return res } // stubbed out
+    res.sendStatus = () => { return res } // stubbed out
+    res.set = (name, value) => {
+      if (name && typeof name === 'object') { // res.set() accepts an object of several headers at once
+        for (const [key, val] of Object.entries(name)) res.set(key, val)
+        return res
+      }
+      headers.set(headerKey(name), { name, value })
+      return res
+    }
+    res.header = res.set // express aliases these
+    res.status = (code) => { res.statusCode = code; return res }
+    res.type = (type) => res.set('Content-Type', type)
+    res.vary = (field) => res.append('Vary', field)
+
+    // properties and methods from the native Node.js http.ServerResponse and http.OutgoingMessage APIs that express's response object inherits from; nothing is ever written to a socket in the browser, so these record what they are given where that is observable and otherwise do nothing; see https://nodejs.org/api/http.html#class-httpserverresponse
+    res.connection = null
+    res.finished = false
+    res.sendDate = true
+    res.socket = null
+    res.statusCode = 200
+    res.statusMessage = 'OK'
+    res.strictContentLength = false
+    res.writableEnded = false
+    res.writableFinished = false
+    res.addTrailers = () => {}
+    res.appendHeader = (name, value) => res.append(name, value)
+    res.cork = () => {}
+    res.uncork = () => {}
+    res.flushHeaders = () => {}
+    res.getHeader = (name) => headers.get(headerKey(name))?.value
+    res.getHeaderNames = () => [...headers.values()].map(header => headerKey(header.name))
+    res.getHeaders = () => Object.fromEntries([...headers.values()].map(header => [headerKey(header.name), header.value]))
+    res.hasHeader = (name) => headers.has(headerKey(name))
+    res.removeHeader = (name) => { headers.delete(headerKey(name)) }
+    res.setHeader = (name, value) => { headers.set(headerKey(name), { name, value }); return res }
+    res.setTimeout = () => res
+    res.write = () => true
+    res.writeContinue = () => {}
+    res.writeEarlyHints = () => {}
+    res.writeHead = (statusCode, statusMessage, suppliedHeaders) => {
+      res.statusCode = statusCode
+      if (typeof statusMessage === 'string') res.statusMessage = statusMessage
+      else suppliedHeaders = statusMessage
+      if (suppliedHeaders) for (const [name, value] of Object.entries(suppliedHeaders)) res.setHeader(name, value)
+      return res
+    }
+    res.writeProcessing = () => {}
+    res.destroy = () => res
+    res.destroyed = false
+    res.writable = true
+    res.addListener = () => res
+    res.emit = () => false
+    res.off = () => res
+    res.on = () => res
+    res.once = () => res
+    res.removeAllListeners = () => res
+    res.removeListener = () => res
+
+    res.render = app.render // they are slightly different methods in express but there is no reason to differentiate between them here
     return res
   }
-  res.header = res.set // express aliases these
-  res.status = (code) => { res.statusCode = code; return res }
-  res.type = (type) => res.set('Content-Type', type)
-  res.vary = (field) => res.append('Vary', field)
-
-  // properties and methods from the native Node.js http.ServerResponse and http.OutgoingMessage APIs that express's response object inherits from; nothing is ever written to a socket in the browser, so these record what they are given where that is observable and otherwise do nothing; see https://nodejs.org/api/http.html#class-httpserverresponse
-  res.connection = null
-  res.finished = false
-  res.sendDate = true
-  res.socket = null
-  res.statusCode = 200
-  res.statusMessage = 'OK'
-  res.strictContentLength = false
-  res.writableEnded = false
-  res.writableFinished = false
-  res.addTrailers = () => {}
-  res.appendHeader = (name, value) => res.append(name, value)
-  res.cork = () => {}
-  res.uncork = () => {}
-  res.flushHeaders = () => {}
-  res.getHeader = (name) => headers.get(headerKey(name))?.value
-  res.getHeaderNames = () => [...headers.values()].map(header => headerKey(header.name))
-  res.getHeaders = () => Object.fromEntries([...headers.values()].map(header => [headerKey(header.name), header.value]))
-  res.hasHeader = (name) => headers.has(headerKey(name))
-  res.removeHeader = (name) => { headers.delete(headerKey(name)) }
-  res.setHeader = (name, value) => { headers.set(headerKey(name), { name, value }); return res }
-  res.setTimeout = () => res
-  res.write = () => true
-  res.writeContinue = () => {}
-  res.writeEarlyHints = () => {}
-  res.writeHead = (statusCode, statusMessage, suppliedHeaders) => {
-    res.statusCode = statusCode
-    if (typeof statusMessage === 'string') res.statusMessage = statusMessage
-    else suppliedHeaders = statusMessage
-    if (suppliedHeaders) for (const [name, value] of Object.entries(suppliedHeaders)) res.setHeader(name, value)
-    return res
-  }
-  res.writeProcessing = () => {}
-  res.destroy = () => res
-  res.destroyed = false
-  res.writable = true
-  res.addListener = () => res
-  res.emit = () => false
-  res.off = () => res
-  res.on = () => res
-  res.once = () => res
-  res.removeAllListeners = () => res
-  res.removeListener = () => res
-
-  defaultReq.res = res // apply the response object to the default request object
 
   // #endregion
 
@@ -761,6 +782,75 @@ function singlePageExpress (options) {
       strict: !!app.appVars['strict routing']
     }
   }
+
+  // what a page's scroll position is remembered under: its route, query string included, and the body it was requested with, if any, since a route showing whatever its body names is a different page for each body
+  function pageKeyFor (route, body) {
+    if (body === undefined) return route
+    try {
+      return `${route} ${JSON.stringify(body)}`
+    } catch {
+      return route // (a body that can't be written out shares its route's scroll position)
+    }
+  }
+
+  // records a navigation in the history: kind is 'push' for a new entry, 'replace' to replace the current one, or 'none'
+  let warnedHistoryRefused = false
+  function recordHistory (kind, entry) {
+    if (kind === 'none' || app.historyMode === 'none') return
+    if (app.historyMode === 'memory') {
+      if (kind === 'replace' && memoryHistory.index >= 0) memoryHistory.entries[memoryHistory.index] = entry
+      else {
+        memoryHistory.entries.splice(memoryHistory.index + 1) // a new entry drops the ones that were ahead of the current one, as a browser does
+        memoryHistory.entries.push(entry)
+        memoryHistory.index++
+      }
+      return
+    }
+    const index = kind === 'replace' ? currentIndex : currentIndex + 1
+    const state = { index, route: entry.route, method: entry.method } // the route, query string included, and the body are kept so the back and forward buttons can ask for the page again exactly as it was asked for
+    if (entry.body !== undefined) state.body = entry.body
+    const write = (state) => kind === 'replace' ? window.history.replaceState(state, '', entry.route) : window.history.pushState(state, '', entry.route)
+    try {
+      try {
+        write(state)
+      } catch (error) {
+        if (error.name !== 'DataCloneError') throw error
+        delete state.body // a body the history can't store is left out of it, so going back to the page asks for it without one
+        write(state)
+      }
+    } catch (error) {
+      // a browser that won't let the url be changed, as some won't for a page loaded from a file, is given a history of the app's own instead
+      if (!warnedHistoryRefused) console.warn(`single-page-express: the browser refused to record a navigation in its history (${error.message}), so navigations are recorded in a history of the app's own from now on, which app.back() and app.forward() move through. pass history: 'memory' to start out that way.`)
+      warnedHistoryRefused = true
+      app.historyMode = 'memory'
+      recordHistory(kind, entry)
+      return
+    }
+    currentIndex = index
+    if (kind === 'push') highestIndex = index
+  }
+
+  // moves through the history by step entries, as the back and forward buttons do; resolves with true once the page moved to has rendered, or false if there was no entry to move to
+  let pendingTraversal = null
+  function traverse (step) {
+    if (app.historyMode === 'memory') {
+      const entry = memoryHistory.entries[memoryHistory.index + step]
+      if (!entry) return Promise.resolve(false)
+      memoryHistory.index += step
+      return handleRoute({ ...entry, skipHistory: true, backButtonPressed: step < 0, forwardButtonPressed: step > 0 }).then(() => true)
+    }
+    if (app.historyMode === 'browser' && (step < 0 ? currentIndex > 0 : currentIndex < highestIndex)) {
+      return new Promise(resolve => {
+        pendingTraversal = resolve
+        window.history.go(step)
+      })
+    }
+    return Promise.resolve(false)
+  }
+  app.back = () => traverse(-1)
+  app.forward = () => traverse(1)
+  app.canGoBack = () => app.historyMode === 'memory' ? memoryHistory.index > 0 : app.historyMode === 'browser' && currentIndex > 0
+  app.canGoForward = () => app.historyMode === 'memory' ? memoryHistory.index < memoryHistory.entries.length - 1 : app.historyMode === 'browser' && currentIndex < highestIndex
 
   // if it's a registered route, fire its event; if it's not, let the browser handle it natively
   async function handleRoute (params) {
@@ -784,32 +874,38 @@ function singlePageExpress (options) {
       // show top bar
       scheduleTopbar(routeWithoutQuery)
 
-      // save scroll position of current page before moving to the next page
-      app.urls[currentRoute] = {
-        scrollX: window.scrollX,
-        scrollY: window.scrollY,
-        scrollingChildContainers: {}
-      }
+      // save scroll position of current page before moving to the next page, unless scroll restoration is off, which saves measuring every element with an id on every navigation
+      if (app.scrollRestoration) {
+        app.urls[currentRoute] = {
+          scrollX: window.scrollX,
+          scrollY: window.scrollY,
+          scrollingChildContainers: {}
+        }
 
-      // save scroll position of child containers that scroll too, so long as they have ids
-      for (const scrollingChildContainer of document.querySelectorAll('[id]')) {
-        if (scrollingChildContainer.scrollHeight > scrollingChildContainer.clientHeight || scrollingChildContainer.scrollWidth > scrollingChildContainer.clientWidth) {
-          app.urls[currentRoute].scrollingChildContainers[scrollingChildContainer.id] = {
-            scrollX: scrollingChildContainer.scrollLeft,
-            scrollY: scrollingChildContainer.scrollTop
+        // save scroll position of child containers that scroll too, so long as they have ids
+        for (const scrollingChildContainer of document.querySelectorAll('[id]')) {
+          if (scrollingChildContainer.scrollHeight > scrollingChildContainer.clientHeight || scrollingChildContainer.scrollWidth > scrollingChildContainer.clientWidth) {
+            app.urls[currentRoute].scrollingChildContainers[scrollingChildContainer.id] = {
+              scrollX: scrollingChildContainer.scrollLeft,
+              scrollY: scrollingChildContainer.scrollTop
+            }
           }
         }
       }
-      currentRoute = routeWithoutQuery // from here on, this is the page on screen
+      const pageKey = pageKeyFor(route, params.body)
+      currentRoute = pageKey // from here on, this is the page on screen
 
-      // alter browser history state
-      if (method === 'get' && !params.skipHistory) {
-        currentIndex++
-        window.history.pushState({ index: currentIndex }, '', route)
-      }
+      // record the navigation in the history
+      if (method === 'get') recordHistory(params.skipHistory ? 'none' : (params.history || 'push'), { route, method, body: params.body })
 
-      // build request object
+      // build request and response objects
       const req = { ...defaultReq }
+      const res = createResponse()
+      req.res = res
+      const navigation = { controller: new window.AbortController(), renders: [] }
+      navigationOf.set(res, navigation)
+      req.signal = navigation.controller.signal // aborted once a later navigation supersedes this one, so a route doing slow work can stop
+      if (method === 'get') supersede(navigation)
 
       // req.body
       if (params.parseBody || params.body) {
@@ -843,7 +939,7 @@ function singlePageExpress (options) {
       if (app.appVars['query parser']) {
         const parts = route.split('?') // split the route by question marks
         route = parts[0] // the first part is the route
-        const queryString = parts.slice(1).join(', ') // all the remaining parts are the query params
+        const queryString = parts.slice(1).join('?') // all the remaining parts are the query string, a ? within which is part of a value
         req.query = Object.fromEntries(new URLSearchParams(queryString).entries()) // convert the query string into key/value pairs
       }
 
@@ -886,27 +982,30 @@ function singlePageExpress (options) {
         error: null,
         handled
       })
-      if (unhandledError) { // nothing in the stack handled the error, so report it the way express's default error handler would
+      if (unhandledError) { // nothing in the stack handled the error: a navigation triggered by app.triggerRoute rejects with it, and one triggered by the page is reported the way express's default error handler would
+        if (!params.event && !params.fromPage) throw unhandledError
         console.error('single-page-express: unhandled error in a route or middleware:')
         console.error(unhandledError)
       }
 
       // scroll the page appropriately
       const scrollPage = () => {
-        // if this page has never been visited before or res.resetScroll or app.alwaysScrollTop is present
-        if (!app.urls[routeWithoutQuery] || res.resetScroll || app.alwaysScrollTop) {
+        // with scroll restoration off, the page is only scrolled when asked to be
+        if (!app.scrollRestoration) {
+          if (res.resetScroll || app.alwaysScrollTop) window.scrollTo(0, 0)
+        } else if (!app.urls[pageKey] || res.resetScroll || app.alwaysScrollTop) { // if this page has never been visited before or res.resetScroll or app.alwaysScrollTop is present
           window.scrollTo(0, 0) // scroll to the top
-          if (res.resetScroll && app.urls[routeWithoutQuery]) {
-            delete app.urls[routeWithoutQuery].scrollX
-            delete app.urls[routeWithoutQuery].scrollY
-            delete app.urls[routeWithoutQuery].scrollingChildContainers
+          if (res.resetScroll && app.urls[pageKey]) {
+            delete app.urls[pageKey].scrollX
+            delete app.urls[pageKey].scrollY
+            delete app.urls[pageKey].scrollingChildContainers
           }
-        } else if (app.urls[routeWithoutQuery]) { // if this page has been visited before
-          window.scrollTo(app.urls[routeWithoutQuery].scrollX || 0, app.urls[routeWithoutQuery].scrollY || 0) // restore the previous scroll position
+        } else if (app.urls[pageKey]) { // if this page has been visited before
+          window.scrollTo(app.urls[pageKey].scrollX || 0, app.urls[pageKey].scrollY || 0) // restore the previous scroll position
           // restore the position of scrollable containers
-          for (const scrollingChildContainer in app.urls[routeWithoutQuery].scrollingChildContainers) {
+          for (const scrollingChildContainer in app.urls[pageKey].scrollingChildContainers) {
             if (document.getElementById(scrollingChildContainer)) {
-              document.getElementById(scrollingChildContainer).scrollTo(app.urls[routeWithoutQuery].scrollingChildContainers[scrollingChildContainer].scrollX || 0, app.urls[routeWithoutQuery].scrollingChildContainers[scrollingChildContainer].scrollY || 0)
+              document.getElementById(scrollingChildContainer).scrollTo(app.urls[pageKey].scrollingChildContainers[scrollingChildContainer].scrollX || 0, app.urls[pageKey].scrollingChildContainers[scrollingChildContainer].scrollY || 0)
             }
           }
         }
@@ -917,7 +1016,19 @@ function singlePageExpress (options) {
       }
       // the render runs this once its update is done, because it is the only thing that knows when that is
       pageSettledCallback = scrollPage
-    }
+
+      // awaiting app.triggerRoute waits for whatever the route rendered to be on the page, render callback included
+      await Promise.all(navigation.renders)
+      if (navigation.customRender && !navigation.controller.signal.aborted) claimPageSettledCallback()() // a custom render method can't settle the page itself, so it's settled once it's done
+    } else if (!params.event && !params.fromPage) console.warn(`single-page-express: app.triggerRoute was asked for ${method.toUpperCase()} ${routeWithoutQuery}, which no route handles, so nothing happened.`)
+  }
+
+  // a navigation triggered by the page itself rather than by app.triggerRoute: nothing is waiting on it, so what goes wrong is reported rather than thrown
+  function handleRouteFromPage (params) {
+    handleRoute({ ...params, fromPage: true }).catch(error => {
+      console.error('single-page-express: unhandled error while handling a navigation:')
+      console.error(error)
+    })
   }
 
   // runs the supplied html validator against post-rendered markup and reports whatever it finds; the validator is supplied by the user rather than bundled, so that people who do not want it pay nothing for it; see the docs for htmlValidator
@@ -966,8 +1077,20 @@ function singlePageExpress (options) {
   }
 
   // app.render implements the express api on the surface, then prescribes some default behavior specific to this module, provides a default method for dom manipulation, and allows for a user to override the default dom manipulation behaviors
+  //
+  // it returns a promise that settles once the render is on the page and its callback, if it returned a promise, has settled, which is what awaiting app.triggerRoute waits for. a render belonging to a navigation that a later one has superseded is not written to the page
   app.render = function (template, model, callback) {
     model = model || {}
+
+    // the navigation this render belongs to, if it's being called as res.render rather than as app.render
+    const navigation = navigationOf.get(this)
+    if (navigation?.controller.signal.aborted) return Promise.resolve()
+    if (navigation) supersede(navigation)
+    let finish
+    let fail
+    const rendered = new Promise((resolve, reject) => { finish = resolve; fail = reject })
+    navigation?.renders.push(rendered)
+    const superseded = () => !!navigation?.controller.signal.aborted
 
     // clear all `this` variables so they do not persist but store local copies for this method invocation's use
     const thisTitle = this.title
@@ -975,6 +1098,7 @@ function singlePageExpress (options) {
     const thisTarget = this.target
     const thisAppendTargets = this.appendTargets
     const thisFocus = this.focus
+    const thisAnnounce = this.announce
     const thisRemoveMetaTags = this.removeMetaTags
     const thisRemoveStyleTags = this.removeStyleTags
     const thisRemoveLinkTags = this.removeLinkTags
@@ -990,6 +1114,7 @@ function singlePageExpress (options) {
     this.target = null
     this.appendTargets = null
     this.focus = null
+    this.announce = null
     this.removeMetaTags = null
     this.removeStyleTags = null
     this.removeLinkTags = null
@@ -1020,9 +1145,19 @@ function singlePageExpress (options) {
     }
 
     if (options.renderMethod) {
-      // execute user-supplied render method if it is provided
-      options.renderMethod(template, model, callback)
+      // execute user-supplied render method if it is provided; if it returns a promise, the render is done once that settles
+      let result
+      try {
+        result = options.renderMethod(template, model, callback)
+      } catch (error) {
+        fail(error)
+        return rendered
+      }
       postRenderCallbacks()
+      Promise.resolve(result).then(() => {
+        if (navigation) navigation.customRender = true // (so the navigation settles the page itself, since a custom render method has no way to)
+        finish()
+      }, fail)
     } else {
       // execute default render method if the user does not supply one
       let err
@@ -1046,6 +1181,7 @@ function singlePageExpress (options) {
 
       let markup = ''
       let htmlValidation = null
+      let updating = false // whether the page is going to be updated, which finishes the render once it has been
       if (!err) {
         // render the template with the chosen templating system
         try {
@@ -1120,7 +1256,7 @@ function singlePageExpress (options) {
             // wait until link tags finish loading before updating the DOM to prevent a FOUC https://en.wikipedia.org/wiki/Flash_of_unstyled_content
             const linkTagsInDiff = diffElements.filter(el => el.tagName.toLowerCase() === 'link')
             const loadPromises = []
-            for (const linkTag of linkTagsInDiff) loadPromises.push(new Promise((resolve) => { linkTag.addEventListener('load', () => resolve()) }))
+            for (const linkTag of linkTagsInDiff) loadPromises.push(new Promise((resolve) => { linkTag.addEventListener('load', () => resolve()); linkTag.addEventListener('error', () => resolve()) })) // (one that fails to load mustn't hold the page back forever)
 
             // wait until script tags finish loading before updating the DOM to prevent a FOUC https://en.wikipedia.org/wiki/Flash_of_unstyled_content
             for (const tag of diffElements) {
@@ -1130,14 +1266,18 @@ function singlePageExpress (options) {
                 script.src = tag.src
                 script.type = 'text/javascript'
                 script.async = true
-                loadPromises.push(new Promise((resolve) => { script.onload = () => resolve() }))
+                loadPromises.push(new Promise((resolve) => { script.onload = () => resolve(); script.onerror = () => resolve() }))
                 document.head.appendChild(script)
               } else document.head.appendChild(tag) // if it's a script we've already seen before, we don't need to wait for it
             }
 
             // update DOM after all link tags and script tags have finished loading
+            updating = true
             Promise.all(loadPromises).then(() => {
               window.setTimeout(async () => {
+                if (superseded()) return finish() // a later navigation has its own render to show
+                let callbackResult
+                let callbackError = null
                 const domUpdate = () => {
                   let updatedATarget = false
 
@@ -1163,16 +1303,20 @@ function singlePageExpress (options) {
 
                   // the remaining work applies to the render as a whole, so it happens once after every target has been written
                   if (updatedATarget) {
-                    announcePageChange()
-                    setFocus()
+                    if (app.announcePageChange && thisAnnounce !== false) announcePageChange() // res.announce = false skips this for one render
+                    if (app.manageFocus && thisFocus !== false) setFocus() // res.focus = false skips this for one render
 
                     // call afterRender methods if they exist
                     if (typeof app.afterEveryRender === 'function') app.afterEveryRender(beforeAfterRenderArg) // call app.afterEveryRender function if it exists
                     if (typeof thisAfterRender === 'function') thisAfterRender(beforeAfterRenderArg) // call res.afterRender function if it exists
                   }
 
-                  // call user-defined callback supplied to the render method if it exists
-                  if (callback && typeof callback === 'function') callback(err, markup)
+                  // call user-defined callback supplied to the render method if it exists. it's run here, as part of the update, but a promise it returns is waited for outside it, since a view transition waits on whatever its update returns
+                  try {
+                    if (callback && typeof callback === 'function') callbackResult = callback(err, markup)
+                  } catch (error) {
+                    callbackError = error
+                  }
 
                   postRenderCallbacks()
                 }
@@ -1205,7 +1349,7 @@ function singlePageExpress (options) {
                   } else if (!focusEl) { // focus the target element instead (defined as the first element that appears in the targets array)
                     const targetEl = document.querySelector(targets[0])
                     if (!targetEl) return
-                    // apply a tabindex attribute to allow focusing non-focusable elements
+                    // apply a tabindex attribute to allow focusing non-focusable elements. it stays on afterwards: an element that stops being focusable while it has focus loses it, which would undo this
                     const originalTabindex = targetEl.getAttribute('tabindex')
                     targetEl.setAttribute('tabindex', '-1')
                     targetEl.focus({ preventScroll: true })
@@ -1220,18 +1364,22 @@ function singlePageExpress (options) {
                 if (document.startViewTransition && !thisSkipViewTransition && !app.alwaysSkipViewTransition) {
                   currentViewTransition = document.startViewTransition(domUpdate)
                   currentViewTransition.finished.then(settleThisPage, settleThisPage) // a transition that is skipped or interrupted still has to settle the page
+                  await currentViewTransition.updateCallbackDone.catch(() => {}) // (the update has run once this settles, whether or not the transition animates)
                 } else {
                   domUpdate()
                   window.setTimeout(settleThisPage, parseInt(thisUpdateDelay) || parseInt(app.updateDelay) || 0) // give a css animation the same amount of time the update itself was given
                 }
+                if (callbackError) return fail(callbackError)
+                Promise.resolve(callbackResult).then(finish, fail)
               }, parseInt(thisUpdateDelay) || parseInt(app.updateDelay) || 0)
             })
           }
         }
       }
+      if (!updating) finish() // nothing is going to be written to the page, which has already been said
     }
+    return rendered
   }
-  res.render = app.render // they are slightly different methods in express but there is no reason to differentiate between them here
 
   // #endregion
 
@@ -1240,19 +1388,27 @@ function singlePageExpress (options) {
   if (!document.singlePageExpressEventListenerAdded) {
     // listen for link navigation events
     document.addEventListener('click', (event) => {
-      if (event.target.tagName === 'A' && event.target.href) handleRoute({ route: event.target.getAttribute('href'), event })
+      // a click anywhere inside a link follows it, unless it's a click the browser gives a meaning of its own: one that's already been handled, one with a modifier key or a button other than the main one (opening the link in a new tab or window), or one on a link to another window, a download, or another origin
+      if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+      const link = event.target.closest?.('a[href]')
+      if (!link) return
+      const target = link.getAttribute('target')
+      if ((target && target !== '_self') || link.hasAttribute('download')) return
+      if (new URL(link.href, window.location.href).origin !== window.location.origin) return
+      handleRouteFromPage({ route: link.getAttribute('href'), event })
     })
 
     // listen for form submits
     document.addEventListener('submit', (event) => {
-      if (event.target.getAttribute('action')) handleRoute({ route: event.target.getAttribute('action'), event, parseBody: true, method: event.target.getAttribute('method') })
+      if (event.target.getAttribute('action')) handleRouteFromPage({ route: event.target.getAttribute('action'), event, parseBody: true, method: event.target.getAttribute('method') })
     })
   }
   document.singlePageExpressEventListenerAdded = true // prevent attaching the event to the DOM twice
 
   // listen for back/forward button properly; the entry the page was loaded on has no history state of its own, and without giving it one the back button cannot return to the page the user started on
-  if (typeof window.history.state?.index !== 'number') window.history.replaceState({ ...window.history.state, index: 0 }, '', window.location.href)
-  let currentIndex = window.history.state.index
+  if (app.historyMode === 'browser' && typeof window.history.state?.index !== 'number') window.history.replaceState({ ...window.history.state, index: 0 }, '', window.location.href)
+  let currentIndex = window.history.state?.index ?? 0
+  let highestIndex = currentIndex // how far forward the history goes, which a new entry cuts back to itself
   if (!window.singlePageExpressGlobalsInitialized) {
     window.singlePageExpressGlobalsInitialized = true // this check prevents the event listener from being loaded multiple times if this constructor gets executed more than once
     window.addEventListener('popstate', (event) => {
@@ -1264,12 +1420,21 @@ function singlePageExpress (options) {
       if (newIndex < currentIndex) backButtonPressed = true
       else if (newIndex > currentIndex) forwardButtonPressed = true
       currentIndex = newIndex
+      // the page is asked for again exactly as it was the first time: by its route, query string included, and with its body, if it had one
+      const traversal = pendingTraversal
+      pendingTraversal = null
       handleRoute({
-        route: window.location.pathname,
+        route: state.route ?? window.location.pathname + window.location.search,
         method: 'get',
+        body: state.body,
+        fromPage: true,
         skipHistory: true, // skipHistory prevents adding a new entry to history when responding to a back/forward button request
         backButtonPressed,
         forwardButtonPressed
+      }).then(() => traversal?.(true), error => {
+        console.error('single-page-express: unhandled error while handling a navigation:')
+        console.error(error)
+        traversal?.(true)
       })
     })
   }

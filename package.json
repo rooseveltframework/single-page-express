@@ -8,7 +8,7 @@
       "url": "https://github.com/rooseveltframework/single-page-express/graphs/contributors"
     }
   ],
-  "version": "2.2.0",
+  "version": "2.3.0",
   "files": [
     "dist",
     "*.md"
@@ -29,18 +29,18 @@
   },
   "main": "single-page-express.js",
   "dependencies": {
-    "path-to-regexp": "8.4.2",
+    "path-to-regexp": "9.0.0",
     "path-to-regexp-express4": "npm:path-to-regexp@0.1.13",
     "topbar": "3.0.1"
   },
   "devDependencies": {
-    "express": "5.2.1",
-    "html-validate": "11.16.0",
-    "playwright": "1.63.0",
+    "express": "5.3.0",
+    "html-validate": "11.17.0",
+    "playwright": "1.64.1",
     "standard": "17.1.2",
-    "teddy": "2.0.4",
+    "teddy": "2.1.0",
     "terser-webpack-plugin": "5.6.1",
-    "webpack": "5.111.1",
+    "webpack": "5.112.2",
     "webpack-cli": "7.2.3"
   },
   "scripts": {

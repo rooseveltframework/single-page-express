@@ -25,7 +25,10 @@ The default render method will handle both full page renders as well as renderin
   - You can also supply an array of query selectors to `res.target`. Elements found matching the query selectors in the array will be replaced with the corresponding query selectors from the rendered template.
   - If you set `res.appendTargets = true`, any new target(s) you add will be in addition to whatever is set by `app.defaultTarget` or `app.defaultTargets`.
 
-- If you set `res.focus`, the browser's focus will be set to that element after the page is rendered. If you do not set `res.focus`, then the browser's focus will be set to the first non-inert element in the DOM with the `autofocus` attribute, or, if none are present, it will be set to whatever the target element was set to for the DOM update. If there are multiple targets, the first target on the list will be what is selected.
+- If you set `res.focus`, the browser's focus will be set to that element after the page is rendered. If you do not set `res.focus`, then the browser's focus will be set to the first non-inert element in the DOM with the `autofocus` attribute, or, if none are present, it will be set to whatever the target element was set to for the DOM update. If there are multiple targets, the first target on the list will be what is selected. Set `res.focus = false` to leave focus where it is for one render, or the `manageFocus` constructor param to `false` to do so for every render, for example in an app whose navigation happens beside content the user is working in.
+  - A target element that can't take focus on its own is given `tabindex="-1"` so it can, and it keeps it: an element that stops being focusable while it has focus loses it, which would undo the move.
+
+- After the page is rendered, its title is announced to screen readers through a visually hidden live region: the first element with a `data-page-title` attribute, or else an `<h1>`, or else the `<title>`. Set `res.announce = false` to skip this for one render, or the `announcePageChange` constructor param to `false` to skip it for every render.
 
 - If you set `res.skipViewTransition`, the DOM update will not be wrapped in a `document.startViewTransition()` call, which is useful in improving performance if you're not doing an animation.
 
@@ -48,6 +51,10 @@ If this DOM manipulation behavior is undesirable to you, you can supply your own
 - `topbarDelay` *[Number]*: How long in milliseconds a navigation has to still be working before the [top bar](https://buunguyen.github.io/topbar/) appears at all. A navigation that has its content ready sooner never shows one. Set it to `0` to show the bar the moment a navigation starts. Default: `250`.
 - `alwaysSkipViewTransition` *[Boolean]*: When set to true, if using the default render method, the DOM update will not be wrapped in a `document.startViewTransition()` call, which is useful in improving performance if you're not doing an animation. Default: `false`.
 - `alwaysScrollTop` *[Boolean]*: Always scroll to the top of the page after every render instead of remembering the scroll position of each page visited and restoring that scroll position when you revisit those pages. Default: `false`.
+- `scrollRestoration` *[Boolean]*: Remember the scroll position of each page visited and restore it when you revisit the page. Set it to `false` to leave the scroll position alone instead, which also saves measuring every element with an `id` on every navigation. Default: `true`.
+- `manageFocus` *[Boolean]*: Move the browser's focus to the new content after every render, if using the default render method. See "Default render method behavior" above. Default: `true`.
+- `announcePageChange` *[Boolean]*: Announce the new page's title to screen readers after every render, if using the default render method. Default: `true`.
+- `history` *[String]*: Where navigations are recorded: `'browser'` in the browser's own history, `'memory'` in a history of the app's own that leaves the url alone, or `'none'`. See "History" in the usage docs. `'memory'` suits a page loaded from a file, as in an Electron app. Default: `'browser'`.
 
 #### Customizing the default render method's behavior
 
@@ -87,6 +94,10 @@ When you call the constructor, it will return an `app` object.
 
 - `afterEveryRender(params)` *[Function]*: Function to execute after every template render sourced from the constructor params.
 - `alwaysScrollTop` *[Boolean]*: If true, the app will not remember scroll position on a per-page basis.
+- `announcePageChange` *[Boolean]*: Whether the new page's title is announced to screen readers after every render, sourced from the constructor params.
+- `historyMode` *[String]*: Where navigations are recorded: `'browser'`, `'memory'`, or `'none'`, sourced from the `history` constructor param, or `'memory'` if the browser refused to record one.
+- `manageFocus` *[Boolean]*: Whether focus is moved to the new content after every render, sourced from the constructor params.
+- `scrollRestoration` *[Boolean]*: Whether scroll positions are remembered and restored, sourced from the constructor params.
 - `alwaysSkipViewTransition` *[Boolean]*: When set to true, if using the default render method, the DOM update will not be wrapped in a `document.startViewTransition()` call.
 - `appVars` *[Object]*: List of variables stored via `app.set()` and retrieved with `app.get()`.
 - `beforeEveryRender(params)` *[Function]*: Function to execute before every template render sourced from the constructor params.
@@ -101,7 +112,7 @@ When you call the constructor, it will return an `app` object.
 - `topbarEnabled` *[Boolean]*: Whether or not the top loading bar is enabled.
 - `topbarRoutes` *[Array of Strings]*: Which routes to use the top loading bar on; defaults to all if this option is not supplied.
 - `updateDelay` *[Number]*: How long to wait before rendering a template sourced from constructor params.
-- `urls` *[Object]*: List of URLs that have been visited and metadata about them.
+- `urls` *[Object]*: List of URLs that have been visited and metadata about them, keyed by route, query string included, and the body the page was asked for with, if any.
 
 ## Express API implementation
 
@@ -167,11 +178,14 @@ These docs describe the Express 5 API, which is what `single-page-express` targe
 
 ##### New methods defined by single-page-express
 
-- `app.triggerRoute(params)`: This will activate the route callback registered for a given route, as though a link was clicked or a form was POSTed. Returns a promise that resolves once the route callback has finished, so you can `await` it.
+- `app.triggerRoute(params)`: This will activate the route callback registered for a given route, as though a link was clicked or a form was POSTed. Returns a promise that resolves once the route callback has finished and what it rendered is on the page, its render callback included, so you can `await` it. It rejects with any error the route or a render callback threw that nothing handled, and a route nothing handles is warned about.
   - Params accepted by `app.triggerRoute` include:
     - `route` *[String]*: Which route you're triggering.
     - `method` *[String]*: e.g. GET, POST, etc. (Case insensitive.)
-    - `body` *[Object]*: What to supply to `req.body` if you're triggering a POST.
+    - `body` *[Object]*: What to supply to `req.body`, for any method. A GET's body is kept in the history, so going back to the page asks for it with the same body.
+    - `history` *[String]*: How a GET is recorded in the history: `'push'` (the default), `'replace'`, or `'none'`.
+- `app.back()` and `app.forward()`: Move back or forward through the history, as the browser's buttons do, in any history mode. Each returns a promise that resolves with `true` once the page moved to has rendered, or `false` if there was nowhere to go.
+- `app.canGoBack()` and `app.canGoForward()`: Whether there's an entry in the history to move back or forward to.
 
 ### Request object
 
@@ -212,6 +226,7 @@ Likewise all other `req` methods [from the Node.js API](https://nodejs.org/api/h
 
 - `req.backButtonPressed` *[Boolean]*: This will be `true` when the browser back button was pressed. A class `backButtonPressed` will also be added to the `<html>` element.
 - `req.forwardButtonPressed` *[Boolean]*: This will be `true` when the browser forward button was pressed. A class `forwardButtonPressed` will also be added to the `<html>` element.
+- `req.signal` *[AbortSignal]*: Aborted once a later navigation supersedes this one. A route doing slow work can check `req.signal.aborted`, or pass it to `fetch()`, to stop early; whatever a superseded navigation renders isn't written to the page either way.
 - `req.singlePageExpress` *[Boolean]*: This property will always be set to `true`. You can use it to detect whether your route is executing in the `single-page-express` context or not.
 
 ### Response object
@@ -229,7 +244,8 @@ Likewise all other `req` methods [from the Node.js API](https://nodejs.org/api/h
 - `res.appendTargets` *[Boolean]*: If using the default render method, set this to `true` to make the target(s) you set with `res.target` apply *in addition to* whatever is set by `app.defaultTarget` or `app.defaultTargets`, rather than replacing them. Has no effect unless `res.target` is also set.
 - `res.afterRender(params)` *[Function]*: If using the default render method, you can set this to a function that will execute after every render.
 - `res.beforeRender(params)` *[Function]*: If using the default render method, you can set this to a function that will execute before every render.
-- `res.focus` *[String]*: If using the default render method, if you set `res.focus`, the browser's focus will be set to that element after the page is rendered. If you do not set `res.focus`, then the browser's focus will be set to the first non-inert element in the DOM with the `autofocus` attribute, or, if none are present, it will be set to whatever the target element was set to for the DOM update.
+- `res.announce` *[Boolean]*: If using the default render method, set this to `false` to skip announcing the new page to screen readers for this render.
+- `res.focus` *[String or Boolean]*: If using the default render method, if you set `res.focus`, the browser's focus will be set to that element after the page is rendered. If you do not set `res.focus`, then the browser's focus will be set to the first non-inert element in the DOM with the `autofocus` attribute, or, if none are present, it will be set to whatever the target element was set to for the DOM update. Set it to `false` to leave focus where it is for this render.
 - `res.removeBaseTags` *[Boolean]*: If using the default render method, this will remove any `<base>` tags from the page before doing the DOM update.
 - `res.removeHeadTags` *[Boolean]*: If using the default render method, this will remove all children of the `<head>` tag except the title element from the page before doing the DOM update.
 - `res.removeLinkTags` *[Boolean]*: If using the default render method, this will remove any `<link>` tags from the page before doing the DOM update.
