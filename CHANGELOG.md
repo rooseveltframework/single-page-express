@@ -1,3 +1,18 @@
+## 2.3.0
+
+- Added the `history` constructor param: `'browser'` (the default), `'memory'`, which records navigations in a history of the app's own and leaves the url alone, as suits a page loaded from a file in an Electron app, or `'none'`. Also added a `history` param for `app.triggerRoute`: `'push'`, `'replace'`, or `'none'`. A browser that refuses to record a navigation switches the app to a memory history, with a warning, rather than the navigation failing.
+- Added `app.back()`, `app.forward()`, `app.canGoBack()`, and `app.canGoForward()`, which work in any history mode.
+- Added `req.signal`, which is aborted once a later navigation supersedes the request.
+- Added the `scrollRestoration`, `manageFocus`, and `announcePageChange` constructor params, and `res.focus = false` and `res.announce = false` to skip moving focus or announcing the page for one render.
+- Fixed `app.triggerRoute` return behavior that could cause race conditions.
+- Fixed overlapping navigations causing race conditions.
+- Fixed the back and forward buttons asking for a page without its query string or the body it was asked for with. Both are kept in the history now.
+- Fixed a click on an element inside a link, such as an icon, not being captured, and fixed clicks the browser gives a meaning of its own being captured: with a modifier key or a button other than the main one, or on a link with a `target`, a `download` attribute, or another origin.
+- Fixed a query string with a `?` in a value being read with a `, ` in its place.
+- Fixed scroll positions being remembered by path alone, so every page a route showed for a different query string or body shared one.
+- Fixed a custom `renderMethod` never restoring the scroll position, and a `<link>` or `<script>` in a new page's head that failed to load holding the page back forever.
+- Updated dependencies.
+
 ## 2.2.0
 
 - Added `singlePageExpress.htmlValidateConfig`, an [html-validate](https://html-validate.org/) config to hand the `htmlValidator` param. It is `html-validate:recommended` with `attribute-boolean-style` and `attribute-empty-style` turned off, by default.

@@ -199,13 +199,28 @@ app.get('/users/:userId', function (req, res) {
 
 Routers have their own `param()` method that works the same way for the routes they hold.
 
-You can also call `app.triggerRoute(params)` to activate the route callback registered for a given route, as though the link was clicked or a form was POSTed. It returns a promise that resolves once the route callback has finished, so you can `await` it.
+You can also call `app.triggerRoute(params)` to activate the route callback registered for a given route, as though the link was clicked or a form was POSTed. It returns a promise that resolves once the route callback has finished and what it rendered is on the page, its render callback included, so you can `await` it. It rejects with any error the route or a render callback threw that nothing handled, and a route nothing handles is warned about.
 
 Params accepted by `app.triggerRoute` include:
 
 - `route`: Which route you're triggering.
 - `method`: e.g. GET, POST, etc. (Case insensitive.)
-- `body`: What to supply to `req.body` if you're triggering a POST.
+- `body`: What to supply to `req.body`. It works for any method, a GET included, and a GET's body is kept in the history, so going back to the page asks for it with the same body.
+- `history`: How a GET is recorded in the history: `'push'` for a new entry (the default), `'replace'` to replace the current entry, for example to show the same page again after something on it changed, or `'none'` to leave it out.
+
+### Navigations that overlap
+
+A GET navigation that starts while an earlier one is still working supersedes it: the earlier one's `req.signal` is aborted, and anything it goes on to render isn't written to the page, so the page always ends up showing the navigation that started last. A route doing slow work can check `req.signal.aborted`, or pass `req.signal` to `fetch()`, to stop early. A navigation with any other method supersedes the ones before it only once it renders, so a form posted to a route that renders nothing doesn't stop a page from rendering.
+
+### History
+
+How navigations are recorded is set by the `history` param in the constructor:
+
+- `'browser'`: in the browser's own history, so the url changes and the browser's back and forward buttons work. This is the default.
+- `'memory'`: in a history of the app's own, which leaves the url alone. This suits a page loaded from a file, as in an Electron app, where a url changed by `pushState` names a file that isn't there, so reloading the page would fail, and some browsers refuse `pushState` altogether. A browser that refuses to record a navigation switches the app to this, with a warning.
+- `'none'`: not at all.
+
+`app.back()` and `app.forward()` move through the history in any of these, resolving with `true` once the page moved to has rendered, or `false` if there was nowhere to go. `app.canGoBack()` and `app.canGoForward()` say whether there is, for example to enable or disable back and forward buttons. Either way, a page is asked for again exactly as it was the first time: its route with its query string, and its body.
 
 ### Validating your templates
 
@@ -298,7 +313,9 @@ For the rest of the differences between the two, see the [Express 5 migration gu
 
 By default, `single-page-express` will remember the scroll position of pages that have been visited. It will also remember the scroll position of child containers on each page as well, but only if those containers have assigned `id` attributes.
 
-If you wish to not remember the scroll position on a per route basis, supply `res.resetScroll = true` in your route. To disable this memory app-wide, set the `alwaysScrollTop` param to `true` in the constructor.
+If you wish to not remember the scroll position on a per route basis, supply `res.resetScroll = true` in your route. To disable this memory app-wide, set the `alwaysScrollTop` param to `true` in the constructor, which scrolls to the top after every render, or set `scrollRestoration` to `false`, which leaves the scroll position alone.
+
+A page's scroll position is remembered by its route, query string included, and the body it was asked for with, if any, so a route that shows whatever its body or query names remembers a scroll position for each one.
 
 ### Running the sample apps
 
