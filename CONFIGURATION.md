@@ -25,12 +25,15 @@ The default render method will handle both full page renders as well as renderin
   - You can also supply an array of query selectors to `res.target`. Elements found matching the query selectors in the array will be replaced with the corresponding query selectors from the rendered template.
   - If you set `res.appendTargets = true`, any new target(s) you add will be in addition to whatever is set by `app.defaultTarget` or `app.defaultTargets`.
 
-- If you set `res.focus`, the browser's focus will be set to that element after the page is rendered. If you do not set `res.focus`, then the browser's focus will be set to the first non-inert element in the DOM with the `autofocus` attribute, or, if none are present, it will be set to whatever the target element was set to for the DOM update. If there are multiple targets, the first target on the list will be what is selected. Set `res.focus = false` to leave focus where it is for one render, or the `manageFocus` constructor param to `false` to do so for every render, for example in an app whose navigation happens beside content the user is working in.
+- If you set `res.focus`, the browser's focus will be set to that element after the page is rendered. If you do not set `res.focus` and the page was reached with the back or forward button, or `app.back()` or `app.forward()`, focus goes back to what had it when the page was left, usually the link that was followed, so a keyboard user carries on from where they were. Otherwise, the browser's focus will be set to the first non-inert element in the DOM with the `autofocus` attribute, or, if none are present, it will be set to whatever the target element was set to for the DOM update. If there are multiple targets, the first target on the list will be what is selected. Set `res.focus = false` to leave focus where it is for one render, or the `manageFocus` constructor param to `false` to do so for every render, for example in an app whose navigation happens beside content the user is working in.
+  - What had focus is remembered by its `id` if it has one, or else by its tag, `href`, `name`, and position among the elements that share those, since every render replaces the elements themselves. If it can't be found or can't take focus, focus moves as it would otherwise.
   - A target element that can't take focus on its own is given `tabindex="-1"` so it can, and it keeps it: an element that stops being focusable while it has focus loses it, which would undo the move.
 
 - After the page is rendered, its title is announced to screen readers through a visually hidden live region: the first element with a `data-page-title` attribute, or else an `<h1>`, or else the `<title>`. Set `res.announce = false` to skip this for one render, or the `announcePageChange` constructor param to `false` to skip it for every render.
 
 - If you set `res.skipViewTransition`, the DOM update will not be wrapped in a `document.startViewTransition()` call, which is useful in improving performance if you're not doing an animation.
+
+- If the user's system asks for reduced motion (`prefers-reduced-motion: reduce`), the DOM update is not wrapped in a view transition either. If your transitions are fit for someone who asked for reduced motion, such as a plain crossfade, set the `viewTransitionsWithReducedMotion` constructor param to `true`. Animations you run yourself from `beforeEveryRender` or `afterEveryRender` are yours to gate behind `prefers-reduced-motion`; see the `express-complex` sample app for one way to do it.
 
 - There are also hooks for setting animations as well. See "Hooks for setting animations" below.
 
@@ -50,6 +53,7 @@ If this DOM manipulation behavior is undesirable to you, you can supply your own
 - `topBarRoutes` *[Array of Strings]*: Which routes to use [top bar](https://buunguyen.github.io/topbar/) on. Defaults to all if this option is not supplied.
 - `topbarDelay` *[Number]*: How long in milliseconds a navigation has to still be working before the [top bar](https://buunguyen.github.io/topbar/) appears at all. A navigation that has its content ready sooner never shows one. Set it to `0` to show the bar the moment a navigation starts. Default: `250`.
 - `alwaysSkipViewTransition` *[Boolean]*: When set to true, if using the default render method, the DOM update will not be wrapped in a `document.startViewTransition()` call, which is useful in improving performance if you're not doing an animation. Default: `false`.
+- `viewTransitionsWithReducedMotion` *[Boolean]*: Wrap DOM updates in view transitions even for a user whose system asks for reduced motion. Only set this if your transitions are fit for them. Default: `false`.
 - `alwaysScrollTop` *[Boolean]*: Always scroll to the top of the page after every render instead of remembering the scroll position of each page visited and restoring that scroll position when you revisit those pages. Default: `false`.
 - `scrollRestoration` *[Boolean]*: Remember the scroll position of each page visited and restore it when you revisit the page. Set it to `false` to leave the scroll position alone instead, which also saves measuring every element with an `id` on every navigation. Default: `true`.
 - `manageFocus` *[Boolean]*: Move the browser's focus to the new content after every render, if using the default render method. See "Default render method behavior" above. Default: `true`.
@@ -99,6 +103,7 @@ When you call the constructor, it will return an `app` object.
 - `manageFocus` *[Boolean]*: Whether focus is moved to the new content after every render, sourced from the constructor params.
 - `scrollRestoration` *[Boolean]*: Whether scroll positions are remembered and restored, sourced from the constructor params.
 - `alwaysSkipViewTransition` *[Boolean]*: When set to true, if using the default render method, the DOM update will not be wrapped in a `document.startViewTransition()` call.
+- `viewTransitionsWithReducedMotion` *[Boolean]*: Whether DOM updates are wrapped in view transitions even for a user whose system asks for reduced motion, sourced from the constructor params.
 - `appVars` *[Object]*: List of variables stored via `app.set()` and retrieved with `app.get()`.
 - `beforeEveryRender(params)` *[Function]*: Function to execute before every template render sourced from the constructor params.
 - `defaultTarget` *[String]*: Query string representing the default element to target if one is not supplied by `res.target`.

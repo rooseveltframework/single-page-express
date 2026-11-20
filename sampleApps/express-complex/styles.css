@@ -1,7 +1,10 @@
 /* global styles */
 
-@view-transition { /* enable multi-page view transitions */
-  navigation: auto;
+/* only animate for users who have not asked their system for reduced motion */
+@media (prefers-reduced-motion: no-preference) {
+  @view-transition { /* enable multi-page view transitions */
+    navigation: auto;
+  }
 }
 
 nav {
@@ -85,35 +88,37 @@ html.fade body > article {
   view-transition-name: page-content-fade;
 }
 
-/* fade */
-::view-transition-old(page-title-fade),
-::view-transition-old(page-content-fade) {
-  animation: var(--fade-out);
-}
+@media (prefers-reduced-motion: no-preference) { /* single-page-express already skips view transitions for these users, but an app that sets viewTransitionsWithReducedMotion still gets them, so they slide only for users who have not asked for reduced motion */
+  /* fade */
+  ::view-transition-old(page-title-fade),
+  ::view-transition-old(page-content-fade) {
+    animation: var(--fade-out);
+  }
 
-::view-transition-new(page-title-fade),
-::view-transition-new(page-content-fade) {
-  animation: var(--fade-in);
-}
+  ::view-transition-new(page-title-fade),
+  ::view-transition-new(page-content-fade) {
+    animation: var(--fade-in);
+  }
 
-/* slide left */
-::view-transition-old(page-title-slide),
-::view-transition-old(page-content-slide) {
-  animation: var(--fade-out), var(--slide-to-left);
-}
+  /* slide left */
+  ::view-transition-old(page-title-slide),
+  ::view-transition-old(page-content-slide) {
+    animation: var(--fade-out), var(--slide-to-left);
+  }
 
-::view-transition-new(page-title-slide),
-::view-transition-new(page-content-slide) {
-  animation: var(--fade-in), var(--slide-from-right);
-}
+  ::view-transition-new(page-title-slide),
+  ::view-transition-new(page-content-slide) {
+    animation: var(--fade-in), var(--slide-from-right);
+  }
 
-/* slide right when the back button is pressed */
-.backButtonPressed::view-transition-old(page-title-slide),
-.backButtonPressed::view-transition-old(page-content-slide) {
-  animation: var(--fade-out), var(--slide-to-right);
-}
+  /* slide right when the back button is pressed */
+  .backButtonPressed::view-transition-old(page-title-slide),
+  .backButtonPressed::view-transition-old(page-content-slide) {
+    animation: var(--fade-out), var(--slide-to-right);
+  }
 
-.backButtonPressed::view-transition-new(page-title-slide),
-.backButtonPressed::view-transition-new(page-content-slide) {
-  animation: var(--fade-in), var(--slide-from-left);
+  .backButtonPressed::view-transition-new(page-title-slide),
+  .backButtonPressed::view-transition-new(page-content-slide) {
+    animation: var(--fade-in), var(--slide-from-left);
+  }
 }
