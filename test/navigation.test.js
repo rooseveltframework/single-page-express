@@ -253,6 +253,55 @@ for (const browserName of browsers) {
         assert.deepEqual(result, ['moved focus, announced', 'kept focus, quiet', 'kept focus, quiet'])
       })
 
+      test('going back or forward puts focus back on the link that was followed from the page', { timeout }, async () => {
+        const result = await run(async ({ makeApp, shown, wait }) => {
+          const app = makeApp()
+          const links = '<a href="/a">a</a> <a href="/b">first b</a> <a href="/b">second b</a>'
+          app.get('/:name', (req, res) => res.render('page', { text: `${req.params.name}: ${links}` }))
+          const follow = async (text) => {
+            const link = [...document.querySelectorAll('#app a')].find(a => a.textContent === text)
+            link.focus()
+            link.click()
+            while (!shown().startsWith(link.getAttribute('href').slice(1) + ':')) await wait(10)
+          }
+          const focused = () => document.activeElement.textContent
+          await app.triggerRoute({ route: '/a' })
+          await follow('second b') // two links share an href, so which of them it was has to be remembered
+          await follow('a')
+          await app.back()
+          const afterBack = focused()
+          await app.back()
+          const afterSecondBack = focused()
+          await app.forward()
+          return [afterBack, afterSecondBack, focused()]
+        })
+        assert.deepEqual(result, ['a', 'second b', 'a'])
+      })
+
+      test('view transitions are skipped for someone who asked for reduced motion, unless the app says they are fit for them', { timeout }, async () => {
+        const transitioned = async (reducedMotion, options) => {
+          await page.emulateMedia({ reducedMotion })
+          await page.evaluate(options => { window.testOptions = options }, options)
+          return run(async ({ makeApp }) => {
+            let used = false
+            document.startViewTransition = (update) => { // stands in for the real thing, which not every browser under test has
+              used = true
+              const done = Promise.resolve(update())
+              return { finished: done, updateCallbackDone: done }
+            }
+            const app = makeApp({ alwaysSkipViewTransition: false, ...window.testOptions })
+            app.get('/page', (req, res) => res.render('page', { text: 'page' }))
+            await app.triggerRoute({ route: '/page' })
+            return used
+          })
+        }
+        assert.deepEqual([
+          await transitioned('no-preference', {}),
+          await transitioned('reduce', {}),
+          await transitioned('reduce', { viewTransitionsWithReducedMotion: true })
+        ], [true, false, true])
+      })
+
       test('with scroll restoration off, the page is left where it is', { timeout }, async () => {
         const result = await run(async ({ makeApp, wait }) => {
           document.body.style.height = '5000px'

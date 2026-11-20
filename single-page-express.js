@@ -359,6 +359,7 @@ function singlePageExpress (options) {
     })
   }
   app.alwaysSkipViewTransition = options.alwaysSkipViewTransition // never wrap dom updates in document.startViewTransition() calls
+  app.viewTransitionsWithReducedMotion = options.viewTransitionsWithReducedMotion // wrap dom updates in view transitions even for someone whose system asks for reduced motion; off by default, since most view transitions move things about
   app.alwaysScrollTop = options.alwaysScrollTop // always scroll to the top of the page after every render
   app.scrollRestoration = options.scrollRestoration ?? true // remember each page's scroll position, and put it back on returning to the page
   app.manageFocus = options.manageFocus ?? true // move focus to the new content after every render, for keyboard and screen reader users
@@ -370,6 +371,22 @@ function singlePageExpress (options) {
   app.urls = {} // list of URLs that have been visited and metadata about them, keyed by route, query and body
   let currentRoute = window.location.pathname // the route currently on screen; the back and forward buttons update window.location before popstate fires, so this is what says which page is being left
   let currentViewTransition // a global reference to the current view transition so we can know when it has ended
+  const focusOnLeaving = new Map() // what had focus on each page when it was left, usually the link that was followed, keyed the same way as app.urls, so going back or forward to the page can put focus back there
+
+  // elements are replaced on every render, so what had focus is remembered by what it is rather than by reference: its id if it has one, or else its tag, its href and name, and which of the elements that share those it was
+  const sameKind = (el, description) => el.getAttribute('href') === description.href && el.getAttribute('name') === description.name
+  function describeElement (el) {
+    if (!el || el === document.body || el === document.documentElement) return null
+    if (el.id) return { id: el.id }
+    const description = { tag: el.tagName, href: el.getAttribute('href'), name: el.getAttribute('name') }
+    description.index = [...document.getElementsByTagName(description.tag)].filter(candidate => sameKind(candidate, description)).indexOf(el)
+    return description
+  }
+  function findDescribedElement (description) {
+    if (!description) return null
+    if (description.id) return document.getElementById(description.id)
+    return [...document.getElementsByTagName(description.tag)].filter(candidate => sameKind(candidate, description))[description.index] || null
+  }
 
   // a client side navigation usually has its content ready in a few milliseconds, and a progress bar that appears for something already finished reads as a glitch rather than as progress: it crawls along on its own timer, then jumps to the end the moment it is told to hide
   //
@@ -892,6 +909,14 @@ function singlePageExpress (options) {
           }
         }
       }
+      // remember what has focus on the page being left: the link that was clicked, the button that submitted the form, or else whatever had focus, such as a button whose handler called app.triggerRoute
+      //
+      // a page left by going back or forward keeps what it had, since focus there is usually just where the last render put it, and recording that would forget the link that was actually followed from the page
+      if (app.manageFocus && !params.backButtonPressed && !params.forwardButtonPressed) {
+        const trigger = (params.event?.type === 'click' ? params.event.target.closest?.('a[href]') : params.event?.submitter) || document.activeElement
+        focusOnLeaving.set(currentRoute, describeElement(trigger))
+      }
+
       const pageKey = pageKeyFor(route, params.body)
       currentRoute = pageKey // from here on, this is the page on screen
 
@@ -905,6 +930,7 @@ function singlePageExpress (options) {
       const navigation = { controller: new window.AbortController(), renders: [] }
       navigationOf.set(res, navigation)
       req.signal = navigation.controller.signal // aborted once a later navigation supersedes this one, so a route doing slow work can stop
+      if (params.backButtonPressed || params.forwardButtonPressed) navigation.returnFocusTo = focusOnLeaving.get(pageKey) // going back or forward to a page puts focus back where it was when the page was left
       if (method === 'get') supersede(navigation)
 
       // req.body
@@ -1338,10 +1364,12 @@ function singlePageExpress (options) {
                   liveRegion.textContent = announcementContentElement.textContent
                 }
 
-                // set browser focus to the declared focus element, or else to the first target
+                // set browser focus to the declared focus element, or else, on going back or forward, to what had focus when the page was left, or else to an autofocus element, or else to the first target
                 function setFocus () {
                   const validElementsForOutline = ['A', 'INPUT', 'TEXTAREA', 'SELECT', 'BUTTON', 'FIELDSET'] // list of elements that are okay to have a visible outline (mostly a problem in just safari; other browsers' default styles don't apply outlines to literally everything that is `focus()`ed)
-                  let focusEl = (thisFocus ? document.querySelector(thisFocus) : null) || document.body.querySelector('[autofocus]') // see if there's a declared focus element
+                  const declaredFocusEl = thisFocus ? document.querySelector(thisFocus) : null
+                  if (!declaredFocusEl && returnFocus()) return
+                  let focusEl = declaredFocusEl || document.body.querySelector('[autofocus]') // see if there's a declared focus element
                   if (focusEl?.closest('[inert], [aria-disabled], [aria-hidden="true"]')) focusEl = null // don't focus elements that have been declared inert
                   if (focusEl && focusEl !== document.activeElement) {
                     focusEl.focus() // only focus if not already focused
@@ -1357,11 +1385,21 @@ function singlePageExpress (options) {
                     if (originalTabindex !== null) targetEl.setAttribute('tabindex', originalTabindex)
                   }
                 }
+                // on going back or forward to a page, puts focus back on what had it when the page was left, so a keyboard user carries on from the link they followed rather than from the top of the page; says whether it could
+                function returnFocus () {
+                  const returnEl = findDescribedElement(navigation?.returnFocusTo)
+                  if (!returnEl || returnEl.closest('[inert], [aria-disabled], [aria-hidden="true"]')) return false
+                  returnEl.focus({ preventScroll: app.scrollRestoration }) // with scroll restoration on, the page is about to be put back where it was, which focusing must not undo
+                  return document.activeElement === returnEl // an element that can't take focus, or no longer can, is passed over
+                }
+
                 // this render claims whatever navigation is waiting on it, so that a transition interrupted by the next navigation settles its own page rather than consuming the one that interrupted it
                 const settleThisPage = claimPageSettledCallback()
                 await contentReady() // there is markup to show, so the top bar has finished reporting; let it play out before anything captures the page
 
-                if (document.startViewTransition && !thisSkipViewTransition && !app.alwaysSkipViewTransition) {
+                // someone whose system asks for reduced motion gets the update without a transition, unless the app says its transitions are fit for them
+                const reducedMotion = !app.viewTransitionsWithReducedMotion && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+                if (document.startViewTransition && !thisSkipViewTransition && !app.alwaysSkipViewTransition && !reducedMotion) {
                   currentViewTransition = document.startViewTransition(domUpdate)
                   currentViewTransition.finished.then(settleThisPage, settleThisPage) // a transition that is skipped or interrupted still has to settle the page
                   await currentViewTransition.updateCallbackDone.catch(() => {}) // (the update has run once this settles, whether or not the transition animates)

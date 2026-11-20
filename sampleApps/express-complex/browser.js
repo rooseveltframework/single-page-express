@@ -6,6 +6,9 @@ const templates = require('./public/templates')
 // register the templates with the teddy templating system
 Object.entries(templates).forEach(([name, template]) => teddy.setTemplate(name, template))
 
+// whether the user's system asks for reduced motion, in which case the pages are swapped without animating; single-page-express already skips view transitions for these users, but the css animations below for browsers without view transitions are this app's own to skip
+const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
 // start single-page-express
 const app = singlePageExpress({
   templatingEngine: teddy,
@@ -19,6 +22,8 @@ const app = singlePageExpress({
 
   // tailor animations based on which page is being visited and handle animations using css animations if view transitions are not supported
   beforeEveryRender: (params) => {
+    if (reducedMotion()) return
+
     // if the last visited page is the current page, do a fade animation, not a slide
     if (!params.targets.includes('body > article') || !params.doc.querySelector('body > article') || params.doc.querySelector('body > article').id === window.lastPageId) {
       document.querySelector('html').classList.add('fade')
@@ -53,6 +58,11 @@ const app = singlePageExpress({
   updateDelay: !document.startViewTransition ? 90 : 0,
 
   afterEveryRender: (params) => {
+    if (reducedMotion()) {
+      window.lastPageId = document.querySelector('body > article').id // no animation will end to record it
+      return
+    }
+
     // if the last visited page is the current page, do a fade animation, not a slide
     if (!params.targets.includes('body > article') || !params.doc.querySelector('body > article') || params.doc.querySelector('body > article').id === window.lastPageId) {
       document.querySelector('body > header > h2').style.animation = 'var(--fade-in)'

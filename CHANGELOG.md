@@ -1,3 +1,10 @@
+## 2.3.1
+
+- Changed the default render method to skip view transitions for users whose system asks for reduced motion. Added the `viewTransitionsWithReducedMotion` constructor param to keep them.
+- Changed the default render method to put focus back where it was when a page was left, usually the link that was followed, on going back or forward to that page.
+- Changed the `express-complex` sample app to animate only for users who have not asked for reduced motion.
+- Updated dependencies.
+
 ## 2.3.0
 
 - Added the `history` constructor param: `'browser'` (the default), `'memory'`, which records navigations in a history of the app's own and leaves the url alone, as suits a page loaded from a file in an Electron app, or `'none'`. Also added a `history` param for `app.triggerRoute`: `'push'`, `'replace'`, or `'none'`. A browser that refuses to record a navigation switches the app to a memory history, with a warning, rather than the navigation failing.
